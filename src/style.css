@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+.gradient-text {
+  background: linear-gradient(45deg, #f8f8f8, #333);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: bold;
+}
+
+@theme inline {
+  --animate-aurora: aurora 60s linear infinite;
+  @keyframes aurora {
+    from {
+      background-position: 50% 50%, 50% 50%;
+    }
+    to {
+      background-position: 350% 50%, 350% 50%;
+    }
+  }
+}
+
+.button-light {
+  background-color: #fff;
+  color: #000;
+  border: 1px solid #d1d5db; /* gray-300 */
+  transition: background 0.15s, color 0.15s;
+}
+.button-light:hover {
+  background-color: #f3f4f6; /* gray-100 */
+}
+
+.button-dark {
+  background-color: #000;
+  color: #fff;
+  border: 1px solid #374151; /* gray-700 */
+  transition: background 0.15s, color 0.15s;
+}
+.button-dark:hover {
+  background-color: #111827; /* gray-900 */
+}
+
+@keyframes shrinkToZero {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-shrink {
+  animation: shrinkToZero 2s forwards;
+}

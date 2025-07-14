@@ -1,0 +1,56 @@
+/* src/components/HaloVisualizer.css */
+.halo-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px; /* Adjust as needed */
+}
+
+.halo-circle.pending {
+  background: radial-gradient(circle, #555522, #ccc34d);
+  box-shadow: 0 0 10px #ccc34d, 0 0 30px #ccc34d;
+  animation: dimPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes dimPulse {
+  0% {
+    box-shadow: 0 0 5px #ccc34d, 0 0 15px #ccc34d;
+    background: radial-gradient(circle, #222, #111);
+    box-shadow: 0 0 10px #111, 0 0 20px #000;
+  }
+  20% {
+    box-shadow: 0 0 10px #ccc34d, 0 0 30px #ccc34d;
+    background: radial-gradient(circle, #555522, #ccc34d);
+    box-shadow: 0 0 10px #ccc34d, 0 0 30px #ccc34d;
+  }
+  100% {
+    background: radial-gradient(circle, #222, #111);
+    box-shadow: 0 0 10px #111, 0 0 20px #000;
+  }
+}
+
+.halo-circle {
+  border-radius: 50%;
+  background: radial-gradient(circle, #333, #1a1a1a); /* Brighter gradient */
+  box-shadow: 0 0 12px #333, 0 0 24px #555; /* Brighter, more diffused shadows */
+  transform: scale(1);
+  transition: transform 0.2s ease-out, background 0.3s, box-shadow 0.3s,
+    width 0.3s ease, height 0.3s ease;
+}
+.halo-circle.active {
+  background: radial-gradient(circle, #3cfaff, #7c34ff);
+  box-shadow: 0 0 20px #3cfaff, 0 0 60px #7c34ff;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 10px #3cfaff, 0 0 40px #7c34ff;
+  }
+  50% {
+    box-shadow: 0 0 20px #3cfaff, 0 0 60px #7c34ff;
+  }
+  100% {
+    box-shadow: 0 0 10px #3cfaff, 0 0 40px #7c34ff;
+  }
+}
