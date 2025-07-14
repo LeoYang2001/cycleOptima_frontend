@@ -1,39 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { Cycle } from "../../types/common/Cycle";
-import { calculateCycleDurations } from "../../utils/totalDuration";
+import {
+  calculateCycleDurations,
+  calculatePhasePortions,
+} from "../../utils/totalDuration";
 import { generateTicks } from "../../utils/generateTicks";
 import { DndContext } from "@dnd-kit/core";
 import { arrayMove, SortableContext } from "@dnd-kit/sortable";
 
 import type { DragEndEvent } from "@dnd-kit/core";
 import PhaseTimeLineView from "../cycleDetail/PhaseTimeLineView";
-
-export type PhaseDuration = {
-  id: string;
-  duration: number;
-};
-
-type PhasePortion = {
-  id: string;
-  portion: number; // e.g., "4.54 %"
-};
-
-function calculatePhasePortions(
-  totalCycleDuration: number,
-  phaseDurations: PhaseDuration[]
-): PhasePortion[] {
-  return phaseDurations.map((phase) => {
-    const percent = (phase.duration / totalCycleDuration) * 100;
-    return {
-      id: phase.id,
-      portion: Number(percent.toFixed(2)),
-    };
-  });
-}
+import { Plus } from "lucide-react";
+import TicksLineComponents from "../cycleDetail/CycleTicksLine";
+import type { Phase } from "../../types/common/Phase";
 
 interface CycleTimeLinePreviewProp {
   cycle: Cycle;
   size?: string;
+  func?: () => void;
+  phases?: Phase[]; // Optional prop for phases
+  setPhases: React.Dispatch<React.SetStateAction<Phase[]>>; // Optional prop for setting phases
 }
 
 export const colorMap = ["#4ADE80", "#60A5FA", "#FBBF24", "#F87171"]; // green, blue, yellow, red
@@ -45,6 +31,9 @@ export function getColorByIndex(index: number): string {
 function CycleTimeLinePreview({
   cycle,
   size = "small",
+  func = () => {},
+  phases = cycle.data.phases || [], // Default to cycle phases if not provided
+  setPhases,
 }: CycleTimeLinePreviewProp) {
   const { totalCycleDuration, phaseDurations } = calculateCycleDurations(cycle);
   const phases_progress = calculatePhasePortions(
@@ -52,20 +41,14 @@ function CycleTimeLinePreview({
     phaseDurations
   );
 
-  // Set up local state for data and phases
-  const [data, setData] = useState(cycle.data);
-  const [phases, setPhases] = useState(data.phases || []);
-
-  // Sync data.phases when phases changes
-  React.useEffect(() => {
-    setData((prevData) => ({
-      ...prevData,
-      phases: phases,
-    }));
-  }, [phases]);
-
+  console.log(phases_progress);
   //for detailed Timeline preview
-  const [ticks, setTicks] = useState(generateTicks(totalCycleDuration * 1.2));
+  const [ticks, setTicks] = useState(generateTicks(totalCycleDuration * 1.15));
+
+  // Update ticks when totalCycleDuration changes
+  useEffect(() => {
+    setTicks(generateTicks(totalCycleDuration * 1.15));
+  }, [totalCycleDuration]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -80,14 +63,6 @@ function CycleTimeLinePreview({
   if (size === "small")
     return (
       <div className=" w-full flex flex-col items-start gap-2 justify-start">
-        <span
-          style={{
-            color: "#5d5d63",
-            opacity: 0.5,
-          }}
-        >
-          Cycle Preview
-        </span>
         <div
           style={{
             height: 12,
@@ -108,7 +83,7 @@ function CycleTimeLinePreview({
                 key={progressBar.id}
                 style={{
                   width: `${progressBar.portion}%`,
-                  backgroundColor: getColorByIndex(index),
+                  backgroundColor: `#${progressBar.color}`,
                 }}
               />
             ))}
@@ -119,32 +94,48 @@ function CycleTimeLinePreview({
   else
     return (
       <div className=" w-full flex flex-col items-start gap-2 justify-start">
-        <span
-          style={{
-            color: "#5d5d63",
-            opacity: 0.5,
-          }}
-        >
-          Cycle Preview
-        </span>
         <div
           style={{
             backgroundColor: "#18181b",
           }}
-          className=" w-full relative mb-2 rounded-lg "
+          className=" w-full relative flex flex-col mb-2 rounded-lg "
         >
-          <div className=" flex flex-row gap-1  p-10 ">
-            <DndContext onDragEnd={handleDragEnd}>
-              <SortableContext items={phases}>
-                {phases.map((phase, key) => (
-                  <PhaseTimeLineView
-                    phases_progress={phases_progress}
-                    key={phase.id}
-                    phase={phase}
-                  />
-                ))}
-              </SortableContext>
-            </DndContext>
+          <div className=" px-10 w-full  top-2 z-30 absolute flex justify-start items-center  text-black">
+            {" "}
+            <TicksLineComponents ticks={ticks} />
+          </div>
+
+          <div className="  flex flex-row gap-1   p-10 ">
+            <div className=" flex-1  flex flex-row  h-full">
+              {phases.length > 0 && phases_progress.length > 0 ? (
+                <DndContext onDragEnd={handleDragEnd}>
+                  <SortableContext items={phases}>
+                    {phases.map((phase, key) => (
+                      <PhaseTimeLineView
+                        phases_progress={phases_progress}
+                        key={phase.id}
+                        phase={phase}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="flex items-center justify-center w-full h-full text-gray-500">
+                  No phases to display
+                </div>
+              )}
+            </div>
+            <div
+              onClick={func}
+              style={{
+                width: "15%",
+                color: "#ccc",
+              }}
+              className=" flex select-none flex-row items-center border gap-1 border-dashed border-gray-500 justify-center rounded-lg p-2 cursor-pointer hover:bg-gray-800 transition-all duration-200"
+            >
+              <Plus size={18} />
+              <span className=" text-sm font-semibold">Add Phase</span>
+            </div>
           </div>
         </div>
       </div>

@@ -38,3 +38,57 @@ export async function deleteWasherCycle(id: string) {
     throw err;
   }
 }
+
+export async function updateWasherCycle(
+  id: string,
+  cycle: {
+    displayName: string;
+    data: any;
+    engineer_note?: string | null;
+  }
+) {
+  try {
+    const res = await fetch(`${API_URL}/api/washer-cycles/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cycle),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || "Failed to update cycle");
+    }
+
+    const result = await res.json();
+    return result;
+  } catch (err: any) {
+    console.error("Update failed:", err.message);
+    throw err;
+  }
+}
+
+export async function upsertWasherCycle(cycle: {
+  id?: string;
+  displayName: string;
+  data: any;
+  engineer_note?: string | null;
+}) {
+  try {
+    const res = await fetch(`${API_URL}/api/washer-cycles/upsert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cycle),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || "Failed to save cycle");
+    }
+
+    const result = await res.json();
+    return result;
+  } catch (err: any) {
+    console.error("Upsert failed:", err.message);
+    throw err;
+  }
+}

@@ -1,33 +1,57 @@
-import { Pencil, Check, CircleX, X } from "lucide-react";
-import React, { useState, useRef } from "react";
+import { Pencil } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
 
-function Note({ text }: { text: string }) {
+interface NoteProps {
+  engineer_note: string;
+  setEngineer_note: (text: string) => void;
+}
+
+function Note({ engineer_note, setEngineer_note }: NoteProps) {
   const [ifExpand, setifExpand] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [noteText, setNoteText] = useState(text);
+  const [noteText, setNoteText] = useState(engineer_note);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Save handler (simulate save)
   const handleSave = () => {
-    setIsEditing(false);
+    setifExpand(false); // Close the note after saving
     inputRef.current?.blur();
-    // TODO: Add actual save logic here
+    setEngineer_note(noteText);
   };
 
+  // Auto-focus on input when expanded
+  useEffect(() => {
+    if (ifExpand) {
+      // Small delay to ensure the input is rendered
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [ifExpand]);
+
   // Calculate dynamic width based on noteText length
-  const dynamicWidth = Math.max(200, Math.min(800, 8 * (noteText.length + 1)));
+  // Account for padding, margins, and ensure content is fully visible
+  const baseWidth = 120; // Minimum width when expanded
+  const charWidth = 8; // Width per character
+  const padding = 32; // Left and right padding (px-4 = 16px each side)
+  const inputPadding = 16; // Input internal padding (px-2 = 8px each side)
+  const buffer = 20; // Extra buffer to ensure full visibility
+
+  const contentWidth = noteText.length * charWidth;
+  const totalWidth = baseWidth + contentWidth + padding + inputPadding + buffer;
+  const dynamicWidth = Math.max(baseWidth, Math.min(800, totalWidth));
 
   return (
     <div
-      className={`relative flex flex-col items-start justify-start gap-2 left-4 ${
+      className={`relative flex flex-row items-center justify-start gap-2 left-4 ${
         ifExpand
-          ? "p-4 h-32 bg-gradient-to-b from-white to-gray-100 rounded-3xl shadow-lg transition-all duration-300 "
-          : "w-12 h-12 p-0 bg-gradient-to-b from-white to-gray-100 rounded-full shadow-lg transition-all duration-300"
+          ? "px-4 bg-gradient-to-b from-white to-gray-100 rounded-full shadow-lg transition-all duration-300"
+          : "w-12 p-0 bg-gradient-to-b from-white to-gray-100 rounded-full shadow-lg transition-all duration-300"
       }`}
       style={{
         overflow: "hidden",
         transition: "all 0.3s cubic-bezier(0.4,0,0.2,1)",
-        minWidth: ifExpand ? 120 : 48,
+        height: 48, // Fixed height
+        minWidth: ifExpand ? 200 : 48,
         width: ifExpand ? dynamicWidth : 48,
       }}
     >
@@ -41,70 +65,32 @@ function Note({ text }: { text: string }) {
         </div>
       ) : (
         <div
-          className="flex flex-col w-full h-full opacity-0 animate-fadeIn"
+          className="flex flex-row items-center w-full h-full opacity-0 animate-fadeIn  px-4"
           style={{ animation: "fadeIn 0.3s forwards" }}
         >
-          <span className="text-gray-800 font-bold mb-1">Note</span>
-          {isEditing ? (
-            <input
-              ref={inputRef}
-              className="w-full px-2 py-1 rounded bg-gray-100 border border-gray-300 text-gray-800 focus:outline-none focus:border-blue-400 transition-all text-sm"
-              value={noteText}
-              placeholder="Type your note here..."
-              style={{ color: "#333", fontWeight: 500, fontSize: "0.875rem" }} // text-sm = 14px
-              onChange={(e) => setNoteText(e.target.value)}
-              onBlur={handleSave}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleSave();
-                }
-              }}
-              autoFocus
-            />
-          ) : (
-            <span
-              className="text-gray-500   px-2 py-1 text-sm cursor-pointer"
-              onClick={() => setIsEditing(true)}
-              tabIndex={0}
-              onFocus={() => setIsEditing(true)}
-              style={{
-                color: noteText ? "#555" : "#9499a1",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-              }} // text-sm = 14px
-            >
-              {noteText || (
-                <span className="text-gray-499">Type your note here...</span>
-              )}
-            </span>
-          )}
-          <div className="ml-auto mt-auto   flex gap-2">
-            {!isEditing ? (
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                }}
-                className=" bg-black rounded-full cursor-pointer flex justify-center items-center"
-                aria-label="Edit Note"
-                onClick={() => setifExpand(false)}
-              >
-                <X size={14} color="#fff" />
-              </div>
-            ) : (
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                }}
-                className=" bg-black rounded-full flex justify-center items-center"
-                aria-label="Save Note"
-                onClick={handleSave}
-              >
-                <Check size={14} color="#fff" />
-              </div>
-            )}
-          </div>
+          <input
+            ref={inputRef}
+            className="flex-1 px-2 py-1 rounded bg-gray-100 text-gray-800 focus:outline-none focus:bg-white focus:shadow-sm transition-all text-sm"
+            value={noteText}
+            placeholder="Type your note here..."
+            style={{
+              color: "#333",
+              fontWeight: 500,
+              fontSize: "0.875rem",
+              border: "1px solid #d1d5db",
+              minWidth: "150px", // Ensure minimum input width
+            }}
+            onChange={(e) => setNoteText(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleSave();
+              }
+              if (e.key === "Escape") {
+                setifExpand(false);
+              }
+            }}
+          />
         </div>
       )}
       {/* FadeIn keyframes */}

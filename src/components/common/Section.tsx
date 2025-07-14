@@ -11,16 +11,18 @@ interface SectionProps {
 function Section({ title, subtitle, icon: Icon, children }: SectionProps) {
   return (
     <section className="bg-black rounded-xl border w-full h-full border-gray-700 p-6 ">
-      <div className="flex items-center mb-2 gap-4">
-        {Icon && <Icon className="text-white" size={24} />}
-        <h2 className="text-white text-2xl font-bold">{title}</h2>
-      </div>
-      {subtitle && (
-        <div className="mb-4">
-          <span className="text-gray-500 text-sm">{subtitle}</span>
+      <div className="h-full flex flex-col">
+        <div className="flex items-center mb-2 gap-4">
+          {Icon && <Icon className="text-white" size={24} />}
+          <h2 className="text-white text-2xl font-bold">{title}</h2>
         </div>
-      )}
-      <div>{children}</div>
+        {subtitle && (
+          <div className="mb-4">
+            <span className="text-gray-500 text-sm">{subtitle}</span>
+          </div>
+        )}
+        <div className="flex-1">{children}</div>
+      </div>
     </section>
   );
 }
