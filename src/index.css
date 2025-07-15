@@ -66,3 +66,70 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Custom Elegant Dark Scrollbar Styles */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #4a5568 #1a202c;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #1a202c;
+  border-radius: 10px;
+  margin: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4a5568 0%, #2d3748 100%);
+  border-radius: 10px;
+  border: 1px solid #2d3748;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #5a6578 0%, #3d4758 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #6a7588 0%, #4d5768 100%);
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: #1a202c;
+}
+
+/* Elegant variant with more subtle styling */
+.elegant-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #374151 #111827;
+}
+
+.elegant-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.elegant-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.elegant-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(55, 65, 81, 0.8);
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+.elegant-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.9);
+  width: 8px;
+}
+
+.elegant-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}

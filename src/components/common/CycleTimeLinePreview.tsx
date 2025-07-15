@@ -131,8 +131,8 @@ function CycleTimeLinePreview({
             <TicksLineComponents ticks={ticks} />
           </div>
 
-          <div className="  flex flex-row gap-1   p-10 ">
-            <div className=" flex-1  flex flex-row  h-full">
+          <div className="flex flex-row gap-1 p-10 overflow-hidden">
+            <div className="flex-1 flex flex-row h-full min-w-0 overflow-hidden">
               {phases.length > 0 && phases_progress.length > 0 ? (
                 <DndContext
                   sensors={sensors}

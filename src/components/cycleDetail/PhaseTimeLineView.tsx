@@ -62,8 +62,10 @@ function PhaseTimeLineView({ phase, phases_progress }: PhaseTimeLineViewProps) {
         backgroundColor: `#${phase.color}`,
         height: 80,
         width: `${progress_portion?.portion}%`,
+        minWidth: 0, // Allow shrinking below content size
+        flexShrink: 1, // Allow shrinking when container is too small
       }}
-      className="flex flex-col mx-0.5 justify-center hover:opacity-90 items-center rounded-lg font-semibold hover:shadow-lg transition-all duration-200 overscroll-x-auto cursor-pointer"
+      className="flex flex-col mx-0.5 justify-center hover:opacity-90 items-center rounded-lg font-semibold hover:shadow-lg transition-all duration-200 cursor-pointer"
       {...attributes}
       {...listeners}
     >
@@ -71,9 +73,6 @@ function PhaseTimeLineView({ phase, phases_progress }: PhaseTimeLineViewProps) {
         <>
           <span className="text-white text-sm font-semibold truncate px-1">
             {phase.name}
-          </span>
-          <span className="text-white opacity-70 text-xs font-semibold truncate px-1">
-            {phase.startTime}ms
           </span>
         </>
       )}

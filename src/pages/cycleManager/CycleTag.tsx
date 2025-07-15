@@ -1,5 +1,4 @@
 import { Tag } from "lucide-react";
-import React from "react";
 
 interface CycleTagProp {
   ifTested: boolean;

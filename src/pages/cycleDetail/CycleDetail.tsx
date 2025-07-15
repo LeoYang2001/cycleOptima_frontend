@@ -167,9 +167,9 @@ function CycleDetail() {
   };
 
   return (
-    <div className=" w-full h-full  flex flex-col">
-      <header className="relative  mb-16">
-        <div className=" flex flex-row justify-between items-center  px-4 py-2">
+    <div className="w-full h-full flex flex-col overflow-hidden ">
+      <header className="relative mb-16">
+        <div className="flex flex-row justify-between items-center px-4 py-2">
           <input
             value={cycleName}
             onChange={(e) => {
@@ -234,10 +234,9 @@ function CycleDetail() {
           />
         </div>
       </header>
-      <section className="flex-1  flex flex-row gap-10 pb-10 w-full ">
-        <div className=" flex flex-col gap-10 w-[70%] h-full ">
-          <div className=" ">
-            {" "}
+      <section className="flex-1 flex flex-row gap-10 pb-10 w-full overflow-hidden">
+        <div className="flex flex-col gap-10 w-[70%] h-full overflow-hidden">
+          <div className="overflow-hidden">
             <Section
               icon={Play}
               title="Phases Timeline"
@@ -252,7 +251,7 @@ function CycleDetail() {
               />
             </Section>
           </div>
-          <div className=" flex-1 ">
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
             <Section icon={Logs} title="Phase Breakdown">
               <PhaseBreakdown
                 deletePhase={deletePhase}
@@ -264,9 +263,9 @@ function CycleDetail() {
         </div>
         <div
           style={{
-            height: "50%",
+            height: "23vw",
           }}
-          className=" flex-1 flex flex-col gap-10 "
+          className="flex-1 flex flex-col gap-10 overflow-y-auto elegant-scrollbar"
         >
           <Section title="Cycle Summary">
             <CycleSummary cycle={cycle} />

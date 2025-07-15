@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { fetchCycles } from "./store/cycleSlice";
 import { io } from "socket.io-client";
 import CycleDetail from "./pages/cycleDetail/CycleDetail";
+import PhaseEditor from "./pages/phaseEditor/PhaseEditor";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -36,6 +37,7 @@ function App() {
           <Route path="ai-assistant" element={<AiAssistant />} />
           <Route path="system-monitor" element={<SystemMonitor />} />
           <Route path="/cycle/:id" element={<CycleDetail />} />
+          <Route path="/cycle/:id/phase/:phaseId" element={<PhaseEditor />} />
         </Route>
       </Routes>
     </BrowserRouter>

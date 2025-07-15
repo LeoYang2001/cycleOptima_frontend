@@ -8,7 +8,7 @@ import { ShootingStars } from "./components/ui/shooting-stars";
 export default function MainLayout() {
   return (
     <div
-      className=" w-[100vw] "
+      className="w-[100vw] overflow-x-hidden elegant-scrollbar"
       style={{ display: "flex", flexDirection: "column", height: "100vh" }}
     >
       <Header />
