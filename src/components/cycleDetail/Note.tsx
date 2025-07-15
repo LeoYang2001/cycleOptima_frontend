@@ -11,11 +11,27 @@ function Note({ engineer_note, setEngineer_note }: NoteProps) {
   const [noteText, setNoteText] = useState(engineer_note);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Save handler (simulate save)
+  // Sync local state with prop when it changes
+  useEffect(() => {
+    setNoteText(engineer_note);
+  }, [engineer_note]);
+
+  // Save handler (only save if text actually changed)
   const handleSave = () => {
     setifExpand(false); // Close the note after saving
     inputRef.current?.blur();
-    setEngineer_note(noteText);
+
+    // Only call setEngineer_note if the text has actually changed
+    if (noteText !== engineer_note) {
+      setEngineer_note(noteText);
+    }
+  };
+
+  // Cancel handler (revert changes and close)
+  const handleCancel = () => {
+    setNoteText(engineer_note); // Revert to original text
+    setifExpand(false);
+    inputRef.current?.blur();
   };
 
   // Auto-focus on input when expanded
@@ -87,7 +103,7 @@ function Note({ engineer_note, setEngineer_note }: NoteProps) {
                 handleSave();
               }
               if (e.key === "Escape") {
-                setifExpand(false);
+                handleCancel();
               }
             }}
           />

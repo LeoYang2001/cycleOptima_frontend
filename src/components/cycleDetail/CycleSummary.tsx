@@ -14,7 +14,6 @@ function CycleSummary({ cycle }: CycleSummaryProps) {
     const phases = cycle.data.phases || [];
     let sum = 0;
     for (const phase of phases) {
-      console.log(phase);
       sum += phase.components.length;
     }
     return sum;
@@ -39,13 +38,14 @@ function CycleSummary({ cycle }: CycleSummaryProps) {
     {
       label: "Total Pause Time",
       value: 0, // Placeholder for total pause time
-      icon: <Pause className="text-red-600" size={28} />,
+      icon: <Pause className="text-red-600 " size={28} />,
     },
   ];
   return (
     <div className="w-full h-full   flex-col gap-3 justify-between grid grid-cols-2 p-4">
       {summaryList.map((item, index) => (
         <div
+          key={item.label + index}
           style={{
             backgroundColor: "#111113",
           }}

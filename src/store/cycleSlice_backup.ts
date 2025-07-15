@@ -29,16 +29,9 @@ interface CycleState {
   error: string | null;
   pendingSync: Record<string, number>; // Track number of changes per cycle
   lastModified: Record<string, number>; // Track when cycles were last modified
-}
-
-const initialState: CycleState = {
-  cycles: [],
-  loading: false,
-  error: null,
-  pendingSync: {},
-  lastModified: {},
 };
 
+const initialState: CycleState = {
 const cycleSlice = createSlice({
   name: "cycles",
   initialState,
@@ -56,9 +49,10 @@ const cycleSlice = createSlice({
         state.cycles.push(updatedCycle);
       }
 
-      // Increment change count
-      state.pendingSync[updatedCycle.id] =
-        (state.pendingSync[updatedCycle.id] || 0) + 1;
+      // Mark for sync
+      if (!state.pendingSync.includes(updatedCycle.id)) {
+        state.pendingSync.push(updatedCycle.id);
+      }
       state.lastModified[updatedCycle.id] = Date.now();
     },
 
@@ -71,8 +65,9 @@ const cycleSlice = createSlice({
 
       if (cycle) {
         cycle.data.phases = phases;
-        // Increment change count
-        state.pendingSync[cycleId] = (state.pendingSync[cycleId] || 0) + 1;
+        if (!state.pendingSync.includes(cycleId)) {
+          state.pendingSync.push(cycleId);
+        }
         state.lastModified[cycleId] = Date.now();
       }
     },
@@ -82,12 +77,14 @@ const cycleSlice = createSlice({
       action: PayloadAction<{ cycleId: string; note: string }>
     ) => {
       const { cycleId, note } = action.payload;
+      console.log({ cycleId, note });
       const cycle = state.cycles.find((c) => c.id === cycleId);
 
       if (cycle) {
         cycle.engineer_note = note;
-        // Increment change count
-        state.pendingSync[cycleId] = (state.pendingSync[cycleId] || 0) + 1;
+        if (!state.pendingSync.includes(cycleId)) {
+          state.pendingSync.push(cycleId);
+        }
         state.lastModified[cycleId] = Date.now();
       }
     },
@@ -101,8 +98,9 @@ const cycleSlice = createSlice({
 
       if (cycle) {
         cycle.data.phases.push(phase);
-        // Increment change count
-        state.pendingSync[cycleId] = (state.pendingSync[cycleId] || 0) + 1;
+        if (!state.pendingSync.includes(cycleId)) {
+          state.pendingSync.push(cycleId);
+        }
         state.lastModified[cycleId] = Date.now();
       }
     },
@@ -118,16 +116,16 @@ const cycleSlice = createSlice({
         cycle.data.phases = cycle.data.phases.filter(
           (phase) => phase.id !== phaseId
         );
-        // Increment change count
-        state.pendingSync[cycleId] = (state.pendingSync[cycleId] || 0) + 1;
+        if (!state.pendingSync.includes(cycleId)) {
+          state.pendingSync.push(cycleId);
+        }
         state.lastModified[cycleId] = Date.now();
       }
     },
 
     markSynced: (state, action: PayloadAction<string>) => {
       const cycleId = action.payload;
-      // Reset change count to 0 (or remove entry)
-      delete state.pendingSync[cycleId];
+      state.pendingSync = state.pendingSync.filter((id) => id !== cycleId);
     },
 
     clearError: (state) => {
@@ -145,7 +143,7 @@ const cycleSlice = createSlice({
         state.cycles = action.payload;
         state.loading = false;
         // Clear pending sync since we have fresh data
-        state.pendingSync = {};
+        state.pendingSync = [];
         state.lastModified = {};
       })
       .addCase(fetchCycles.rejected, (state, action) => {
@@ -158,8 +156,7 @@ const cycleSlice = createSlice({
       })
       .addCase(syncCycleToDatabase.fulfilled, (state, action) => {
         const cycleId = action.meta.arg.id;
-        // Reset change count for this cycle
-        delete state.pendingSync[cycleId];
+        state.pendingSync = state.pendingSync.filter((id) => id !== cycleId);
         // Update with server response if needed
         const serverCycle = action.payload;
         if (serverCycle) {
@@ -197,17 +194,8 @@ export const selectCycleById = (
 export const selectPendingSyncCycles = (state: { cycles: CycleState }) =>
   state.cycles.pendingSync;
 export const selectCyclesNeedingSync = (state: { cycles: CycleState }) =>
-  state.cycles.cycles.filter(
-    (cycle) =>
-      state.cycles.pendingSync[cycle.id] &&
-      state.cycles.pendingSync[cycle.id] > 0
-  );
-
-// New selector to get total pending changes count
-export const selectTotalPendingChanges = (state: { cycles: CycleState }) =>
-  Object.values(state.cycles.pendingSync).reduce(
-    (total, count) => total + count,
-    0
+  state.cycles.cycles.filter((cycle) =>
+    state.cycles.pendingSync.includes(cycle.id)
   );
 
 export default cycleSlice.reducer;

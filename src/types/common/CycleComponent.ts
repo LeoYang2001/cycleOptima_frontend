@@ -1,4 +1,5 @@
 export type CycleComponent = {
+  id: string;
   label: string;
   start: number;
   compId: string;

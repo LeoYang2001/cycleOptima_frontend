@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../store";
+import { useSelector, useDispatch } from "react-redux";
+import type { RootState, AppDispatch } from "../../store";
 import { useParams } from "react-router-dom";
 import type { Cycle } from "../../types/common/Cycle";
 import Button from "../../components/common/Button";
@@ -9,84 +9,114 @@ import Note from "../../components/cycleDetail/Note";
 import Section from "../../components/common/Section";
 import CycleTimeLinePreview from "../../components/common/CycleTimeLinePreview";
 import PhaseBreakdown from "../../components/cycleDetail/PhaseBreakdown";
-import { upsertWasherCycle } from "../../apis/cycles";
 import CycleSummary from "../../components/cycleDetail/CycleSummary";
+import { useAutoSync } from "../../hooks/useAutoSync";
+import {
+  selectCycleById,
+  updateCycleOptimistically,
+  updateCyclePhases,
+  updateCycleNote,
+  addPhaseOptimistically,
+  deletePhaseOptimistically,
+} from "../../store/cycleSlice";
 
 function CycleDetail() {
   const { id } = useParams<{ id: string }>();
-  const cycles = useSelector((state: RootState) => state.cycles.cycles);
+  const dispatch = useDispatch<AppDispatch>();
 
-  const foundCycle: Cycle | undefined = cycles.find((c) => c.id === id);
+  // Get cycle from Redux store
+  const cycle = useSelector((state: RootState) => selectCycleById(state, id!));
 
-  if (!foundCycle) {
-    return <div className="text-red-500">Cycle not found</div>;
-  }
+  // Set up auto-sync (disabled for manual control)
+  const { pendingCount, triggerSync } = useAutoSync({
+    enabled: false, // Disable auto-sync for manual control
+    debounceMs: 1500,
+  });
 
-  // Set up local state for cycle and its components
-  const [cycle, setCycle] = useState<Cycle>(foundCycle);
-  const [cycleName, setCycleName] = useState(cycle.displayName);
+  // Local UI state (non-persisted) - MUST be declared before any conditional returns
+  const [cycleName, setCycleName] = useState(cycle?.displayName || "");
   const [inputFocus, setInputFocus] = useState(false);
-
-  // Set up local state for data and phases
-  const [data, setData] = useState(cycle.data);
-  const [phases, setPhases] = useState(data.phases || []);
+  const [engineer_note, setEngineer_note] = useState(
+    cycle?.engineer_note || ""
+  );
   const [isSaving, setIsSaving] = useState(false);
-  const [engineer_note, setEngineer_note] = useState(cycle.engineer_note || "");
 
-  // Sync data.phases when phases changes
-  useEffect(() => {
-    setData((prevData) => {
-      const updatedData = {
-        ...prevData,
-        phases: phases,
-      };
-
-      setCycle((prevCycle) => ({
-        ...prevCycle,
-        data: updatedData,
-      }));
-
-      return updatedData;
-    });
-
-    console.log("phases updated", phases);
-  }, [phases]);
-  // Save handler
+  // Manual save trigger (for save button) - defined early so useEffect can reference it
   const handleSave = async () => {
-    setIsSaving(true);
-
     try {
-      // Prepare the data to save
-      const updateData = {
-        id: cycle.id, // Include the ID for update, or undefined for create
-        displayName: cycleName,
-        data: {
-          ...data,
-          phases: phases,
-        },
-        engineer_note: engineer_note,
-      };
+      if (pendingCount === 0 || !cycle) {
+        return; // No changes to save or no cycle, do nothing
+      }
 
-      // Call the upsert API to create or update the cycle
-      const result = await upsertWasherCycle(updateData);
+      setIsSaving(true);
+      await triggerSync(cycle.id);
 
-      // Show success message with operation type
-      alert(
-        `Cycle ${
-          result.operation === "create" ? "created" : "updated"
-        } successfully!`
-      );
-
-      console.log("Cycle saved:", updateData);
-      console.log("Result:", result);
+      // Success - isSaving will be reset when pendingCount becomes 0
     } catch (error) {
       console.error("Save failed:", error);
+      setIsSaving(false); // Reset loading state on error
       alert(`Failed to save cycle: ${(error as Error).message}`);
-    } finally {
-      setIsSaving(false);
     }
   };
 
+  // Sync local state with Redux state when cycle changes
+  useEffect(() => {
+    if (cycle) {
+      setCycleName(cycle.displayName);
+      setEngineer_note(cycle.engineer_note || "");
+    }
+  }, [cycle?.displayName, cycle?.engineer_note]);
+
+  // Add keyboard shortcut for saving (Ctrl+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (pendingCount > 0) {
+          handleSave();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [pendingCount, handleSave]);
+
+  // Reset saving state when all changes are saved
+  useEffect(() => {
+    if (pendingCount === 0 && isSaving) {
+      setIsSaving(false);
+    }
+  }, [pendingCount, isSaving]);
+
+  // NOW we can do conditional returns after all hooks are declared
+  if (!cycle) {
+    return <div className="text-red-500">Cycle not found</div>;
+  }
+
+  // Update cycle name in Redux (optimistic)
+  const updateCycleName = (newName: string) => {
+    setCycleName(newName);
+    dispatch(
+      updateCycleOptimistically({
+        ...cycle,
+        displayName: newName,
+      })
+    );
+  };
+
+  // Update engineer note in Redux (optimistic)
+  const updateEngineerNote = (newNote: string) => {
+    setEngineer_note(newNote);
+    dispatch(
+      updateCycleNote({
+        cycleId: cycle.id,
+        note: newNote,
+      })
+    );
+  };
+
+  // Add phase (optimistic update)
   const addPhase = () => {
     const newPhase = {
       id: Date.now().toString(),
@@ -95,11 +125,45 @@ function CycleDetail() {
       startTime: 10000,
       components: [],
     };
-    setPhases((prevPhases) => [...prevPhases, newPhase]);
+
+    dispatch(
+      addPhaseOptimistically({
+        cycleId: cycle.id,
+        phase: newPhase,
+      })
+    );
   };
 
+  // Delete phase (optimistic update)
   const deletePhase = (phaseId: string) => {
-    setPhases((prevPhases) => prevPhases.filter((p) => p.id !== phaseId));
+    dispatch(
+      deletePhaseOptimistically({
+        cycleId: cycle.id,
+        phaseId: phaseId,
+      })
+    );
+  };
+
+  // Update phases (for drag and drop reordering)
+  const updatePhases = (newPhases: typeof cycle.data.phases) => {
+    dispatch(
+      updateCyclePhases({
+        cycleId: cycle.id,
+        phases: newPhases,
+      })
+    );
+  };
+
+  // Wrapper for setPhases compatibility with existing components
+  const setPhases = (
+    updater: React.SetStateAction<typeof cycle.data.phases>
+  ) => {
+    if (typeof updater === "function") {
+      const newPhases = updater(cycle.data.phases);
+      updatePhases(newPhases);
+    } else {
+      updatePhases(updater);
+    }
   };
 
   return (
@@ -109,7 +173,7 @@ function CycleDetail() {
           <input
             value={cycleName}
             onChange={(e) => {
-              setCycleName(e.target.value);
+              updateCycleName(e.target.value);
             }}
             onFocus={() => {
               setInputFocus(true);
@@ -117,7 +181,7 @@ function CycleDetail() {
             onBlur={() => {
               setInputFocus(false);
             }}
-            className="w-[40%]  transition-all duration-200"
+            className="w-[40%] transition-all duration-200"
             style={{
               color: !inputFocus ? "#aaa" : "#fff",
               fontFamily: !inputFocus ? "Andale Mono, monospace" : "sans-serif",
@@ -131,18 +195,42 @@ function CycleDetail() {
               }
             }}
           />
-          <Button
-            icon={SaveIcon}
-            label={isSaving ? "Saving..." : "Save Cycle"}
-            theme="light"
-            func={handleSave}
-            disabled={isSaving}
-          />
+          <div className="flex items-center gap-4">
+            {isSaving ? (
+              <div className="flex items-center gap-3 bg-blue-900/20 border border-blue-600/30 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-spin border border-blue-200"></div>
+                  <span className="text-blue-300 text-sm font-medium">
+                    Saving changes...
+                  </span>
+                </div>
+              </div>
+            ) : pendingCount > 0 ? (
+              <div className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                  <span className="text-yellow-300 text-sm font-medium">
+                    unsaved change{pendingCount > 1 ? "s" : ""}
+                  </span>
+                </div>
+                <span className="text-yellow-400 text-xs opacity-70">
+                  Ctrl+S
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-green-300 text-sm font-medium">
+                  All changes saved
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex flex-row absolute left-0 top-16">
           <Note
             engineer_note={cycle.engineer_note || "No notes available"}
-            setEngineer_note={setEngineer_note}
+            setEngineer_note={updateEngineerNote}
           />
         </div>
       </header>
@@ -157,7 +245,7 @@ function CycleDetail() {
             >
               <CycleTimeLinePreview
                 setPhases={setPhases}
-                phases={phases}
+                phases={cycle.data.phases}
                 cycle={cycle}
                 size="large"
                 func={addPhase}
@@ -169,7 +257,7 @@ function CycleDetail() {
               <PhaseBreakdown
                 deletePhase={deletePhase}
                 cycle={cycle}
-                Phases={phases}
+                Phases={cycle.data.phases}
               />
             </Section>
           </div>

@@ -7,7 +7,7 @@ import {
 } from "../../utils/totalDuration";
 import PhaseTimeLinePreview from "../common/PhaseTimeLinePreview";
 import type { Cycle } from "../../types/common/Cycle";
-import { Delete, Pencil, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 interface PhaseBreakdownProps {
   Phases: Phase[];

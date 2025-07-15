@@ -197,11 +197,7 @@ export const selectCycleById = (
 export const selectPendingSyncCycles = (state: { cycles: CycleState }) =>
   state.cycles.pendingSync;
 export const selectCyclesNeedingSync = (state: { cycles: CycleState }) =>
-  state.cycles.cycles.filter(
-    (cycle) =>
-      state.cycles.pendingSync[cycle.id] &&
-      state.cycles.pendingSync[cycle.id] > 0
-  );
+  state.cycles.cycles.filter((cycle) => state.cycles.pendingSync[cycle.id] > 0);
 
 // New selector to get total pending changes count
 export const selectTotalPendingChanges = (state: { cycles: CycleState }) =>

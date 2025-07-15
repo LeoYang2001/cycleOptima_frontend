@@ -5,8 +5,19 @@ import {
   calculatePhasePortions,
 } from "../../utils/totalDuration";
 import { generateTicks } from "../../utils/generateTicks";
-import { DndContext } from "@dnd-kit/core";
-import { arrayMove, SortableContext } from "@dnd-kit/sortable";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
 
 import type { DragEndEvent } from "@dnd-kit/core";
 import PhaseTimeLineView from "../cycleDetail/PhaseTimeLineView";
@@ -44,14 +55,29 @@ function CycleTimeLinePreview({
   console.log(phases_progress);
   //for detailed Timeline preview
   const [ticks, setTicks] = useState(generateTicks(totalCycleDuration * 1.15));
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Configure sensors for better drag experience
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts
+      },
+    })
+  );
 
   // Update ticks when totalCycleDuration changes
   useEffect(() => {
     setTicks(generateTicks(totalCycleDuration * 1.15));
   }, [totalCycleDuration]);
 
+  const handleDragStart = (event: DragEndEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
 
     if (over && active.id !== over.id) {
       const oldIndex = phases.findIndex((item) => item.id === active.id);
@@ -77,7 +103,7 @@ function CycleTimeLinePreview({
             }}
           />
           <div className=" rounded-xl absolute w-full left-0 h-full overflow-hidden flex flex-row items-center justify-start ">
-            {phases_progress.map((progressBar, index) => (
+            {phases_progress.map((progressBar) => (
               <div
                 className=" h-full "
                 key={progressBar.id}
@@ -108,9 +134,17 @@ function CycleTimeLinePreview({
           <div className="  flex flex-row gap-1   p-10 ">
             <div className=" flex-1  flex flex-row  h-full">
               {phases.length > 0 && phases_progress.length > 0 ? (
-                <DndContext onDragEnd={handleDragEnd}>
-                  <SortableContext items={phases}>
-                    {phases.map((phase, key) => (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={phases}
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    {phases.map((phase) => (
                       <PhaseTimeLineView
                         phases_progress={phases_progress}
                         key={phase.id}
@@ -118,6 +152,14 @@ function CycleTimeLinePreview({
                       />
                     ))}
                   </SortableContext>
+                  <DragOverlay>
+                    {activeId ? (
+                      <PhaseTimeLineView
+                        phases_progress={phases_progress}
+                        phase={phases.find((p) => p.id === activeId)!}
+                      />
+                    ) : null}
+                  </DragOverlay>
                 </DndContext>
               ) : (
                 <div className="flex items-center justify-center w-full h-full text-gray-500">
