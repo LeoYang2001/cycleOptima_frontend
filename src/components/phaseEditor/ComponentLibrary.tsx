@@ -99,7 +99,7 @@ function ComponentLibraryView({ component }: ComponentLibraryProps) {
     ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
         zIndex: 99999,
-        position: "fixed" as const,
+        position: "absolute" as const, // Use absolute instead of fixed
         width: libraryWidth, // Preserve the original width
       }
     : {};
@@ -145,13 +145,13 @@ function ComponentLibraryView({ component }: ComponentLibraryProps) {
   );
 }
 
-function ComponentLibrary() {
-  const libraryComponents = useSelector((state: RootState) =>
-    selectAllLibraryComponents(state)
-  );
-  const isLoading = useSelector((state: RootState) =>
-    selectLibraryLoading(state)
-  );
+function ComponentLibrary({
+  libraryComponents,
+  isLoading,
+}: {
+  libraryComponents: CycleComponent[];
+  isLoading: boolean;
+}) {
   const error = useSelector((state: RootState) => selectLibraryError(state));
 
   if (isLoading) {

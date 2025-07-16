@@ -13,6 +13,10 @@ import { Save, ArrowLeft } from "lucide-react";
 import ComponentTimeline from "../../components/phaseEditor/ComponentTimeline";
 import ComponentLibrary from "../../components/phaseEditor/ComponentLibrary";
 import { DndContext, type DragEndEvent } from "@dnd-kit/core";
+import {
+  selectAllLibraryComponents,
+  selectLibraryLoading,
+} from "../../store/librarySlice";
 
 function PhaseEditor() {
   const dispatch = useDispatch<AppDispatch>();
@@ -44,6 +48,15 @@ function PhaseEditor() {
   );
   const phase = cycle?.data.phases.find((p) => p.id === phaseId);
 
+  console.log("phase:", phase);
+
+  const libraryComponents = useSelector((state: RootState) =>
+    selectAllLibraryComponents(state)
+  );
+  const isLoading = useSelector((state: RootState) =>
+    selectLibraryLoading(state)
+  );
+
   const [phaseName, setPhaseName] = useState(phase?.name || "");
   const [startTime, setStartTime] = useState(phase?.startTime || 0);
   const [components, setComponents] = useState(phase?.components || []);
@@ -52,7 +65,9 @@ function PhaseEditor() {
 
   // Check if changes have been made
   const hasChanges =
-    phaseName !== (phase?.name || "") || startTime !== (phase?.startTime || 0);
+    phaseName !== (phase?.name || "") ||
+    startTime !== (phase?.startTime || 0) ||
+    JSON.stringify(components) !== JSON.stringify(phase?.components || []);
 
   // Handle save changes
   const handleSaveChanges = () => {
@@ -66,7 +81,14 @@ function PhaseEditor() {
 
     // Update the phase in the cycle
     const updatedPhases = cycle.data.phases.map((p) =>
-      p.id === phaseId ? { ...p, name: phaseName, startTime: startTime } : p
+      p.id === phaseId
+        ? {
+            ...p,
+            name: phaseName,
+            startTime: startTime,
+            components: components,
+          }
+        : p
     );
 
     // Update cycle with modified phase (optimistic update)
@@ -105,8 +127,20 @@ function PhaseEditor() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
-    console.log({ active, over });
+    if (over && over.id === "droppable") {
+      console.log({ active, over });
+      //append active component to the components array
+      const libraryComponent = libraryComponents.find(
+        (c) => c.compId === active.id
+      );
+      if (libraryComponent) {
+        const newComponent = {
+          ...libraryComponent,
+          id: Date.now().toString(),
+        };
+        setComponents((prev) => [...prev, newComponent]);
+      }
+    }
     setIsDragging(false);
   };
   return (
@@ -173,13 +207,17 @@ function PhaseEditor() {
               <ComponentTimeline
                 isDragging={isDragging}
                 components={components}
+                startTime={startTime}
                 setComponents={setComponents}
               />
             </Section>
           </div>
-          <div className="w-[25%]   overflow-y-auto">
+          <div className="w-[25%] h-[800px] overflow-hidden overflow-y-auto">
             <Section title="Component Library">
-              <ComponentLibrary />
+              <ComponentLibrary
+                libraryComponents={libraryComponents}
+                isLoading={isLoading}
+              />
             </Section>
           </div>
         </section>

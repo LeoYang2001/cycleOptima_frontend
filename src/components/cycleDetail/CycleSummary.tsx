@@ -10,6 +10,7 @@ interface CycleSummaryProps {
 
 function CycleSummary({ cycle }: CycleSummaryProps) {
   const { totalCycleDuration, phaseDurations } = calculateCycleDurations(cycle);
+  console.log("cycle from summary:", cycle);
   function calculateTotalComponents() {
     const phases = cycle.data.phases || [];
     let sum = 0;
@@ -17,6 +18,15 @@ function CycleSummary({ cycle }: CycleSummaryProps) {
       sum += phase.components.length;
     }
     return sum;
+  }
+
+  function calculateTotalPauseTime() {
+    const phases = cycle.data.phases || [];
+    let totalPauseTime = 0;
+    for (const phase of phases) {
+      totalPauseTime += phase.startTime || 0;
+    }
+    return totalPauseTime;
   }
 
   const summaryList = [
@@ -37,7 +47,7 @@ function CycleSummary({ cycle }: CycleSummaryProps) {
     },
     {
       label: "Total Pause Time",
-      value: 0, // Placeholder for total pause time
+      value: formatTimeLabel(calculateTotalPauseTime()),
       icon: <Pause className="text-red-600 " size={28} />,
     },
   ];
