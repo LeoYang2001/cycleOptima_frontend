@@ -13,6 +13,7 @@ import {
   CloudRain,
   Droplets,
   Egg,
+  Flame,
   RefreshCw,
   RotateCcw,
   Settings,
@@ -25,48 +26,52 @@ interface ComponentLibraryProps {
   component: CycleComponent;
 }
 
-function getComponentIcon(component: CycleComponent) {
-  const iconSize = 18; // Default icon size
-  function getStyle(compId: string) {
-    switch (compId) {
-      case "Cold Valve":
-        return {
-          color: "#60a5fa",
-          icon: <Droplets size={iconSize} color="#fff" />,
-        };
-      case "Drain Pump":
-        return {
-          color: "#ef4848",
-          icon: <Wind size={iconSize} color="#fff" />,
-        };
-      case "Drain Valve":
-        return {
-          color: "#8b5cf6",
-          icon: <CloudRain size={iconSize} color="#fff" />,
-        };
-      case "Motor":
-        return {
-          color: "#f97316",
-          icon: <RefreshCw size={iconSize} color="#fff" />,
-        };
-      case "Retractor":
-        return {
-          color: "#f59e0b",
-          icon: <RotateCcw size={iconSize} color="#fff" />,
-        };
-      case "Softener Valve":
-        return {
-          color: "#06b6d4",
-          icon: <Egg size={iconSize} color="#fff" />,
-        };
-      default:
-        return {
-          color: "#10b981",
-          icon: <CircleQuestionMark size={iconSize} color="#fff" />,
-        };
-    }
+export function getStyle(compId: string, iconSize = 18) {
+  switch (compId) {
+    case "Cold Valve":
+      return {
+        color: "#60a5fa",
+        icon: <Droplets size={iconSize} color="#fff" />,
+      };
+    case "Drain Pump":
+      return {
+        color: "#ef4848",
+        icon: <Wind size={iconSize} color="#fff" />,
+      };
+    case "Drain Valve":
+      return {
+        color: "#8b5cf6",
+        icon: <CloudRain size={iconSize} color="#fff" />,
+      };
+    case "Motor":
+      return {
+        color: "#f97316",
+        icon: <RefreshCw size={iconSize} color="#fff" />,
+      };
+    case "Retractor":
+      return {
+        color: "#f59e0b",
+        icon: <RotateCcw size={iconSize} color="#fff" />,
+      };
+    case "Softener Valve":
+      return {
+        color: "#06b6d4",
+        icon: <Egg size={iconSize} color="#fff" />,
+      };
+    case "Hot Valve":
+      return {
+        color: "#ec4818",
+        icon: <Flame size={iconSize} color="#fff" />,
+      };
+    default:
+      return {
+        color: "#10b981",
+        icon: <CircleQuestionMark size={iconSize} color="#fff" />,
+      };
   }
+}
 
+function getComponentIcon(component: CycleComponent) {
   const compStyle = getStyle(component.compId);
 
   return (
