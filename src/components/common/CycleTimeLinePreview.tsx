@@ -52,7 +52,6 @@ function CycleTimeLinePreview({
     phaseDurations
   );
 
-  console.log(phases_progress);
   //for detailed Timeline preview
   const [ticks, setTicks] = useState(generateTicks(totalCycleDuration * 1.15));
   const [activeId, setActiveId] = useState<string | null>(null);

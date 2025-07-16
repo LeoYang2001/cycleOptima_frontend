@@ -11,6 +11,8 @@ import Section from "../../components/common/Section";
 import PhaseConfiguration from "../../components/phaseEditor/PhaseConfiguration";
 import { Save, ArrowLeft } from "lucide-react";
 import ComponentTimeline from "../../components/phaseEditor/ComponentTimeline";
+import ComponentLibrary from "../../components/phaseEditor/ComponentLibrary";
+import { DndContext, type DragEndEvent } from "@dnd-kit/core";
 
 function PhaseEditor() {
   const dispatch = useDispatch<AppDispatch>();
@@ -45,6 +47,8 @@ function PhaseEditor() {
   const [phaseName, setPhaseName] = useState(phase?.name || "");
   const [startTime, setStartTime] = useState(phase?.startTime || 0);
   const [components, setComponents] = useState(phase?.components || []);
+
+  const [isDragging, setIsDragging] = useState(false);
 
   // Check if changes have been made
   const hasChanges =
@@ -95,72 +99,92 @@ function PhaseEditor() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [hasChanges, handleSaveChanges]);
 
-  return (
-    <div className="w-full h-full flex flex-col">
-      <header className="flex flex-row items-center justify-between px-4 py-6 border-b border-gray-800">
-        <div className="flex flex-row items-center gap-4">
-          <div className="flex flex-col justify-center items-start">
-            <span
-              className="text-3xl font-bold text-white"
-              style={{
-                color: "#fff",
-                fontFamily: "Andale Mono, monospace",
-              }}
-            >
-              Phase Editor
-            </span>
-            <span className="text-gray-400 text-sm">
-              Configure components and timing for "
-              {phase?.name || "Unknown Phase"}"
-            </span>
-          </div>
-        </div>
+  const handleDragStart = () => {
+    setIsDragging(true);
+  };
 
-        <div className="flex items-center gap-4">
-          {/* Changes indicator */}
-          {hasChanges ? (
-            <div className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                <span className="text-yellow-300 text-sm font-medium">
-                  Unsaved changes
-                </span>
-              </div>
-              <span className="text-yellow-400 text-xs opacity-70">Ctrl+S</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span className="text-green-300 text-sm font-medium">
-                All changes saved
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    console.log({ active, over });
+    setIsDragging(false);
+  };
+  return (
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div
+        className="w-full h-full flex flex-col relative"
+        style={{ zIndex: 1 }}
+      >
+        <header className="flex flex-row items-center justify-between px-4 py-6 ">
+          <div className="flex flex-row items-center gap-4">
+            <div className="flex flex-col justify-center items-start">
+              <span
+                className="text-3xl font-bold text-white"
+                style={{
+                  color: "#fff",
+                  fontFamily: "Andale Mono, monospace",
+                }}
+              >
+                Phase Editor
+              </span>
+              <span className="text-gray-400 text-sm">
+                Configure components and timing for "
+                {phase?.name || "Unknown Phase"}"
               </span>
             </div>
-          )}
-        </div>
-      </header>
+          </div>
 
-      <section className="flex-1 overflow-y-auto gap-10  py-10  flex flex-row">
-        <div className="w-[70%] flex flex-col gap-10 ">
-          <Section title="Phase Configuration">
-            <PhaseConfiguration
-              phaseName={phaseName}
-              setPhaseName={setPhaseName}
-              startTime={startTime}
-              setStartTime={setStartTime}
-            />
-          </Section>
-          <Section title="Component Timeline">
-            <ComponentTimeline
-              components={components}
-              setComponents={setComponents}
-            />
-          </Section>
-        </div>
-        <div className="w-[30%]   ">
-          <Section title="Phase Details">demo</Section>
-        </div>
-      </section>
-    </div>
+          <div className="flex items-center gap-4">
+            {/* Changes indicator */}
+            {hasChanges ? (
+              <div className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                  <span className="text-yellow-300 text-sm font-medium">
+                    Unsaved changes
+                  </span>
+                </div>
+                <span className="text-yellow-400 text-xs opacity-70">
+                  Ctrl+S
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span className="text-green-300 text-sm font-medium">
+                  All changes saved
+                </span>
+              </div>
+            )}
+          </div>
+        </header>
+
+        <section className="flex-1 overflow-y-auto gap-10  py-10  flex flex-row">
+          <div className="w-[70%] flex flex-col gap-10 ">
+            <Section title="Phase Configuration">
+              <PhaseConfiguration
+                phaseName={phaseName}
+                setPhaseName={setPhaseName}
+                startTime={startTime}
+                setStartTime={setStartTime}
+              />
+            </Section>
+            <Section title="Component Timeline">
+              <ComponentTimeline
+                isDragging={isDragging}
+                components={components}
+                setComponents={setComponents}
+              />
+            </Section>
+          </div>
+          <div className="w-[25%]   overflow-y-auto">
+            <Section title="Component Library">
+              <ComponentLibrary />
+            </Section>
+          </div>
+        </section>
+      </div>
+    </DndContext>
   );
 }
 

@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "./store";
 import { useEffect } from "react";
 import { fetchCycles } from "./store/cycleSlice";
+import { fetchLibrary } from "./store/librarySlice";
 import { io } from "socket.io-client";
 import CycleDetail from "./pages/cycleDetail/CycleDetail";
 import PhaseEditor from "./pages/phaseEditor/PhaseEditor";
@@ -18,6 +19,7 @@ function App() {
 
   useEffect(() => {
     dispatch(fetchCycles());
+    dispatch(fetchLibrary());
     const socket = io("http://localhost:4000");
     socket.on("cycle_updated", () => {
       dispatch(fetchCycles()); // Refetch when notified

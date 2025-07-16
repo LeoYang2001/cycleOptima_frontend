@@ -1,9 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import cycleReducer from "./cycleSlice";
+import libraryReducer from "./librarySlice";
 
 export const store = configureStore({
   reducer: {
     cycles: cycleReducer,
+    library: libraryReducer,
   },
 });
 
