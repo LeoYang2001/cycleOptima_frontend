@@ -9,7 +9,7 @@ import {
 import { useAutoSync } from "../../hooks/useAutoSync";
 import Section from "../../components/common/Section";
 import PhaseConfiguration from "../../components/phaseEditor/PhaseConfiguration";
-import { Save, ArrowLeft } from "lucide-react";
+import { Save, ArrowLeft, X } from "lucide-react";
 import ComponentTimeline from "../../components/phaseEditor/ComponentTimeline";
 import ComponentLibrary from "../../components/phaseEditor/ComponentLibrary";
 import {
@@ -22,6 +22,8 @@ import {
   selectAllLibraryComponents,
   selectLibraryLoading,
 } from "../../store/librarySlice";
+import ComponentEditor from "../../components/phaseEditor/ComponentEditor";
+import type { CycleComponent } from "../../types/common/CycleComponent";
 
 function PhaseEditor() {
   const dispatch = useDispatch<AppDispatch>();
@@ -69,6 +71,24 @@ function PhaseEditor() {
     x: number;
     distanceToRightBorder: number;
   } | null>(null);
+  const [showModal, setShowModal] = useState(false);
+
+  const [selectedComponent, setSelectedComponent] =
+    useState<CycleComponent | null>(null);
+
+  useEffect(() => {
+    if (selectedComponent) {
+      // Do something with the selected component
+      setShowModal(true);
+    } else {
+      setShowModal(false);
+    }
+  }, [selectedComponent]);
+
+  const handleRemoveModal = () => {
+    setShowModal(false);
+    setSelectedComponent(null);
+  };
 
   // Custom modifier to restrict right dragging based on initial position
   const restrictRightDragging: Modifier = ({ transform }) => {
@@ -85,6 +105,44 @@ function PhaseEditor() {
     };
   };
 
+  // Modal component
+  const Modal = ({
+    isOpen,
+    onClose,
+    children,
+  }: {
+    isOpen: boolean;
+    onClose: () => void;
+    children: React.ReactNode;
+  }) => {
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        {/* Mask/Backdrop */}
+        <div
+          className="absolute inset-0 bg-black opacity-80"
+          onClick={onClose}
+        ></div>
+
+        {/* Modal Content */}
+        <div
+          style={{
+            width: "60%",
+            height: selectedComponent?.compId.startsWith("Motor")
+              ? "80%"
+              : "60%",
+            borderWidth: 1,
+            borderColor: "#333",
+          }}
+          className="relative bg-black  rounded-lg w-full  z-10"
+        >
+          {children}
+        </div>
+      </div>
+    );
+  };
+
   // Check if changes have been made
   const hasChanges =
     phaseName !== (phase?.name || "") ||
@@ -93,7 +151,7 @@ function PhaseEditor() {
 
   // Handle save changes
   const handleSaveChanges = () => {
-    if (!cycle || !phase || !hasChanges) return;
+    if (!cycle || !phase || !hasChanges || selectedComponent) return;
 
     // Validate phase name is not empty
     if (!phaseName.trim()) {
@@ -182,6 +240,19 @@ function PhaseEditor() {
     setIsDragging(false);
     setInitialDragPosition(null); // Reset initial position
   };
+
+  // Handle component deletion
+  const handleDeleteComponent = (componentId: string) => {
+    setComponents((prev) =>
+      prev.filter((component) => component.id !== componentId)
+    );
+
+    // If the deleted component was selected, close the modal
+    // if (selectedComponent?.id === componentId) {
+    //   setSelectedComponent(null);
+    //   setShowModal(false);
+    // }
+  };
   return (
     <div
       className="w-full h-full flex flex-col relative overflow-hidden"
@@ -252,12 +323,15 @@ function PhaseEditor() {
                 components={components}
                 startTime={startTime}
                 setComponents={setComponents}
+                setSelectedComponent={setSelectedComponent}
+                onDeleteComponent={handleDeleteComponent}
               />
             </Section>
           </div>
           <div className="w-[25%] h-[800px] overflow-hidden overflow-y-auto">
             <Section title="Component Library">
               <ComponentLibrary
+                setSelectedComponent={setSelectedComponent}
                 libraryComponents={libraryComponents}
                 isLoading={isLoading}
               />
@@ -265,6 +339,14 @@ function PhaseEditor() {
           </div>
         </section>
       </DndContext>
+
+      {/* Modal */}
+      <Modal isOpen={showModal} onClose={handleRemoveModal}>
+        <ComponentEditor
+          setComponents={setComponents}
+          component={selectedComponent}
+        />
+      </Modal>
     </div>
   );
 }
