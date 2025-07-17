@@ -16,11 +16,6 @@ import {
 } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
 
-interface ComponentLibraryProps {
-  // Define any props if needed
-  component: CycleComponent;
-}
-
 export function getStyle(compId: string, iconSize = 18) {
   switch (compId) {
     case "Cold Valve":
@@ -83,8 +78,15 @@ function getComponentIcon(component: CycleComponent) {
     </div>
   );
 }
-
-function ComponentLibraryView({ component }: ComponentLibraryProps) {
+interface ComponentLibraryProps {
+  // Define any props if needed
+  component: CycleComponent;
+  setSelectedComponent: (component: CycleComponent | null) => void;
+}
+function ComponentLibraryView({
+  component,
+  setSelectedComponent,
+}: ComponentLibraryProps) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: component.compId,
     data: {
@@ -106,9 +108,6 @@ function ComponentLibraryView({ component }: ComponentLibraryProps) {
 
   return (
     <div
-      {...attributes}
-      {...listeners}
-      ref={setNodeRef}
       style={{
         height: 70,
         width: "100%",
@@ -117,23 +116,38 @@ function ComponentLibraryView({ component }: ComponentLibraryProps) {
         border: "1px solid #333",
         ...draggableStyle,
       }}
-      className=" rounded-lg p-4 flex flex-row select-none items-center justify-start hover:opacity-80 cursor-pointer transition-opacity duration-200"
+      className=" relative border border-white"
     >
-      {getComponentIcon(component)}
-      <div className="flex flex-col  justify-center items-start">
-        <span className=" font-semibold text-white text-nowrap ">
-          {component.label}
-        </span>
-        <span
-          style={{
-            fontSize: 12,
-          }}
-          className="text-gray-400"
-        >
-          {component.compId}
-        </span>
+      <div
+        {...attributes}
+        {...listeners}
+        ref={setNodeRef}
+        className=" rounded-lg p-4 flex flex-row select-none items-center justify-start hover:opacity-80  active:cursor-grabbing cursor-grab transition-opacity duration-200"
+      >
+        {getComponentIcon(component)}
+        <div className="flex flex-col  justify-center items-start">
+          <span className=" font-semibold text-white text-nowrap ">
+            {component.label}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+            }}
+            className="text-gray-400"
+          >
+            {component.compId}
+          </span>
+        </div>
       </div>
-      <div className="flex p-2  justify-center items-center ml-auto ">
+      <div
+        style={{
+          top: "50%",
+          right: 10,
+          transform: "translateY(-50%)",
+        }}
+        onClick={() => setSelectedComponent(component)}
+        className="flex p-2  cursor-pointer absolute ustify-center items-center ml-auto "
+      >
         <Settings
           color="#fff"
           className="hover:opacity-100"
@@ -148,9 +162,11 @@ function ComponentLibraryView({ component }: ComponentLibraryProps) {
 function ComponentLibrary({
   libraryComponents,
   isLoading,
+  setSelectedComponent,
 }: {
   libraryComponents: CycleComponent[];
   isLoading: boolean;
+  setSelectedComponent: (component: CycleComponent | null) => void;
 }) {
   const error = useSelector((state: RootState) => selectLibraryError(state));
 
@@ -174,7 +190,11 @@ function ComponentLibrary({
     <div className="p-4">
       <div className="space-y-5">
         {libraryComponents.map((component) => (
-          <ComponentLibraryView key={component.id} component={component} />
+          <ComponentLibraryView
+            key={component.id}
+            component={component}
+            setSelectedComponent={setSelectedComponent}
+          />
         ))}
       </div>
       {libraryComponents.length === 0 && (

@@ -33,8 +33,8 @@ export function generateTicks(
       // round to nearest millisecond
       label = `${Math.round(time)}ms`;
     } else if (unit === "sec") {
-      // convert to whole seconds
-      const secs = Math.round(time / 1000);
+      // convert to seconds with one decimal place
+      const secs = (time / 1000).toFixed(1);
       label = `${secs}s`;
     } else {
       // minutes and seconds
@@ -83,7 +83,7 @@ export function generateTicksWithStartTime(
     if (unit === "ms") {
       return `${Math.round(time)}ms`;
     } else if (unit === "sec") {
-      const secs = Math.round(time / 1000);
+      const secs = (time / 1000).toFixed(1);
       return `${secs}s`;
     } else {
       const totalSec = Math.round(time / 1000);

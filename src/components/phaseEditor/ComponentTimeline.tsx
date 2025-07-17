@@ -1,7 +1,6 @@
 import React from "react";
 import type { CycleComponent } from "../../types/common/CycleComponent";
 import { useDroppable } from "@dnd-kit/core";
-import { Plus } from "lucide-react";
 import { getStyle } from "./ComponentLibrary";
 import { generateTicksWithStartTime } from "../../utils/generateTicks";
 
@@ -9,12 +8,20 @@ interface ComponentViewProps {
   component: CycleComponent;
   percentageOfTotal: number;
   percentageOfActive: number;
+  startPercentage: number;
+  runningPercentage: number;
+  setSelectedComponent: (component: CycleComponent | null) => void; // Function to set selected component
+  onDeleteComponent: (componentId: string) => void; // Function to delete component
 }
 
 function ComponentView({
   component,
   percentageOfTotal,
   percentageOfActive,
+  startPercentage,
+  runningPercentage,
+  setSelectedComponent,
+  onDeleteComponent,
 }: ComponentViewProps) {
   const compStyle = getStyle(component.compId);
 
@@ -28,22 +35,67 @@ function ComponentView({
   const showBoth = actualWidth >= minWidthForBoth;
   const showIconOnly = actualWidth >= minWidthForIcon && !showBoth;
 
-  console.log(component);
-  console.log("percentageOfActive:", percentageOfActive);
+  const handleClick = () => {
+    setSelectedComponent(component);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering the main click handler
+
+    // Show confirmation dialog
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete the component "${component.label}"?\n\nThis action cannot be undone.`
+    );
+
+    if (confirmDelete) {
+      onDeleteComponent(component.id);
+    }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent browser context menu
+    handleDeleteClick(e);
+  };
 
   return (
     <div
       style={{
-        width: `${percentageOfActive.toFixed(1)}%`,
+        width: `100%`,
         height: 50,
-        backgroundColor: compStyle.color,
       }}
-      className=" rounded p-2 mb-2 flex flex-row items-center justify-center gap-2 text-white text-sm overflow-hidden"
+      className=" flex flex-row justify-start items-center  mb-2"
     >
-      {(showBoth || showIconOnly) && compStyle.icon}
-      {showBoth && (
-        <div className="font-semibold text-nowrap">{component.label}</div>
-      )}
+      <div
+        style={{
+          width: `${startPercentage.toFixed(1)}%`,
+          backgroundColor: "transparent",
+        }}
+        className=" h-full"
+      />
+      <div
+        style={{
+          width: `${percentageOfActive.toFixed(1)}%`,
+
+          backgroundColor: compStyle.color,
+        }}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+        className="group rounded p-2 h-full  relative flex cursor-pointer flex-row items-center hover:opacity-70 transition-opacity duration-200 justify-center gap-2 text-white text-sm overflow-hidden"
+        title="Left-click to edit • Right-click to delete"
+      >
+        {(showBoth || showIconOnly) && compStyle.icon}
+        {showBoth && (
+          <div className="font-semibold text-nowrap">{component.label}</div>
+        )}
+
+        {/* Visual indicator for right-click */}
+        <div
+          className="absolute top-1 right-1 w-2 h-2 rounded-full bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          style={{ fontSize: "8px" }}
+        >
+          <span className="sr-only">Right-click to delete</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -54,6 +106,8 @@ interface ComponentTimelineProps {
   setComponents: (components: CycleComponent[]) => void; // Replace with actual type
   isDragging: boolean; // To control the mask style
   startTime?: number; // Optional start time for the timeline
+  setSelectedComponent: (component: CycleComponent | null) => void; // Function to set selected component
+  onDeleteComponent: (componentId: string) => void; // Function to delete component
 }
 
 function ComponentTimeline({
@@ -61,6 +115,8 @@ function ComponentTimeline({
   setComponents,
   isDragging,
   startTime,
+  setSelectedComponent,
+  onDeleteComponent,
 }: ComponentTimelineProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: "droppable",
@@ -92,16 +148,29 @@ function ComponentTimeline({
       (activeDuration / totalPhaseDuration) * 100;
 
     // Calculate each component's percentage over active duration
-    const componentPercentages = components.map((component) => ({
-      id: component.id,
-      label: component.label,
-      duration: component.duration || 0,
-      percentageOfTotal: ((component.duration || 0) / totalPhaseDuration) * 100,
-      percentageOfActive:
-        activeDuration > 0
-          ? ((component.duration || 0) / activeDuration) * 100
-          : 0,
-    }));
+    const componentPercentages = components.map((component) => {
+      const componentStart = component.start || 0;
+      const componentDuration = component.duration || 0;
+      const totalComponentDuration = componentStart + componentDuration;
+
+      return {
+        id: component.id,
+        label: component.label,
+        duration: componentDuration,
+        start: componentStart,
+        percentageOfTotal: (componentDuration / totalPhaseDuration) * 100,
+        percentageOfActive:
+          activeDuration > 0 ? (componentDuration / activeDuration) * 100 : 0,
+        startPercentage:
+          totalComponentDuration > 0
+            ? (componentStart / activeDuration) * 100
+            : 0,
+        runningPercentage:
+          totalComponentDuration > 0
+            ? (componentDuration / totalComponentDuration) * 100
+            : 0,
+      };
+    });
 
     return {
       pauseTime,
@@ -197,29 +266,7 @@ function ComponentTimeline({
               borderRadius: "8px",
             }}
             className="absolute z-10 w-full h-full flex justify-center items-center"
-          >
-            {isOver ? (
-              <span
-                style={{
-                  color: "#3673d9",
-                  fontSize: 16,
-                }}
-                className="font-semibold"
-              >
-                <Plus size={38} />
-              </span>
-            ) : (
-              <span
-                style={{
-                  color: "#3673d9",
-                  fontSize: 16,
-                }}
-                className="font-semibold"
-              >
-                Drop component here
-              </span>
-            )}
-          </div>
+          />
         )}
         {/* Dragover Mask  */}
         <div
@@ -240,29 +287,31 @@ function ComponentTimeline({
             }}
             className="absolute w-full h-full flex flex-row z-1"
           >
-            <div
-              className="   bg-transparent border-r-1 h-full"
-              style={{
-                width: `${Math.min(
-                  percentageData.pauseTimePercentage,
-                  35
-                ).toFixed(1)}%`,
-                borderColor: "#333",
-                backgroundImage:
-                  "repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.1) 5px, rgba(255,255,255,0.1) 10px)",
-              }}
-            >
-              <span
+            {startTime && (
+              <div
+                className="   bg-transparent border-r-1 h-full"
                 style={{
-                  left: 0,
-                  top: -35,
-                  transform: "translateX(-50%)",
+                  width: `${Math.min(
+                    percentageData.pauseTimePercentage,
+                    35
+                  ).toFixed(1)}%`,
+                  borderColor: "#333",
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.1) 5px, rgba(255,255,255,0.1) 10px)",
                 }}
-                className=" absolute  text-sm text-gray-500"
               >
-                {ticks[0].label}
-              </span>
-            </div>
+                <span
+                  style={{
+                    left: 0,
+                    top: -35,
+                    transform: "translateX(-50%)",
+                  }}
+                  className=" absolute  text-sm text-gray-500"
+                >
+                  {ticks[0].label}
+                </span>
+              </div>
+            )}
             <div className=" flex-1 flex h-full bg-transparent   flex-row ">
               {ticks.slice(1, -1).map((tick, index) => {
                 if (index === ticks.length - 3) {
@@ -336,17 +385,21 @@ function ComponentTimeline({
             }}
             className=" flex items-center justify-center text-xs font-semibold"
           ></div>
-          <div className="flex-1 h-full p-2">
+          <div className="flex-1 h-full py-2  border-transparent border-4 ">
             {percentageData.componentPercentages.map((componentData) => {
               const component = components.find(
                 (c) => c.id === componentData.id
               );
               return component ? (
                 <ComponentView
+                  setSelectedComponent={setSelectedComponent}
                   key={component.id}
                   component={component}
                   percentageOfTotal={componentData.percentageOfTotal}
                   percentageOfActive={componentData.percentageOfActive}
+                  startPercentage={componentData.startPercentage}
+                  runningPercentage={componentData.runningPercentage}
+                  onDeleteComponent={onDeleteComponent}
                 />
               ) : null;
             })}
