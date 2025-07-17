@@ -12,7 +12,12 @@ import PhaseConfiguration from "../../components/phaseEditor/PhaseConfiguration"
 import { Save, ArrowLeft } from "lucide-react";
 import ComponentTimeline from "../../components/phaseEditor/ComponentTimeline";
 import ComponentLibrary from "../../components/phaseEditor/ComponentLibrary";
-import { DndContext, type DragEndEvent } from "@dnd-kit/core";
+import {
+  DndContext,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import type { Modifier } from "@dnd-kit/core";
 import {
   selectAllLibraryComponents,
   selectLibraryLoading,
@@ -48,8 +53,6 @@ function PhaseEditor() {
   );
   const phase = cycle?.data.phases.find((p) => p.id === phaseId);
 
-  console.log("phase:", phase);
-
   const libraryComponents = useSelector((state: RootState) =>
     selectAllLibraryComponents(state)
   );
@@ -62,6 +65,25 @@ function PhaseEditor() {
   const [components, setComponents] = useState(phase?.components || []);
 
   const [isDragging, setIsDragging] = useState(false);
+  const [initialDragPosition, setInitialDragPosition] = useState<{
+    x: number;
+    distanceToRightBorder: number;
+  } | null>(null);
+
+  // Custom modifier to restrict right dragging based on initial position
+  const restrictRightDragging: Modifier = ({ transform }) => {
+    if (!initialDragPosition) {
+      return transform;
+    }
+
+    const maxRightMovement = initialDragPosition.distanceToRightBorder - 20; // 20px margin from right edge
+    const constrainedX = Math.min(transform.x, maxRightMovement);
+
+    return {
+      ...transform,
+      x: constrainedX,
+    };
+  };
 
   // Check if changes have been made
   const hasChanges =
@@ -121,8 +143,24 @@ function PhaseEditor() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [hasChanges, handleSaveChanges]);
 
-  const handleDragStart = () => {
+  const handleDragStart = (event: DragStartEvent) => {
     setIsDragging(true);
+    // Get the draggable element's position
+    const activeElement = event.active;
+    console.log("activeElement:", activeElement);
+    if (activeElement && activeElement.rect && activeElement.rect.current) {
+      const rect = activeElement.rect.current.translated;
+      if (rect) {
+        const elementRight = rect.left + rect.width;
+        const distanceToRightBorder = window.innerWidth - elementRight;
+        // Set initial drag position
+
+        setInitialDragPosition({
+          x: rect.left,
+          distanceToRightBorder: distanceToRightBorder,
+        });
+      }
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -142,12 +180,17 @@ function PhaseEditor() {
       }
     }
     setIsDragging(false);
+    setInitialDragPosition(null); // Reset initial position
   };
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div
-        className="w-full h-full flex flex-col relative"
-        style={{ zIndex: 1 }}
+    <div
+      className="w-full h-full flex flex-col relative overflow-hidden"
+      style={{ zIndex: 1 }}
+    >
+      <DndContext
+        modifiers={[restrictRightDragging]}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
       >
         <header className="flex flex-row items-center justify-between px-4 py-6 ">
           <div className="flex flex-row items-center gap-4">
@@ -221,8 +264,8 @@ function PhaseEditor() {
             </Section>
           </div>
         </section>
-      </div>
-    </DndContext>
+      </DndContext>
+    </div>
   );
 }
 

@@ -1,12 +1,7 @@
 import React from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../store";
-import {
-  selectAllLibraryComponents,
-  selectLibraryLoading,
-  selectLibraryError,
-} from "../../store/librarySlice";
-import { formatTimeLabel } from "../../utils/formatTime";
+import { selectLibraryError } from "../../store/librarySlice";
 import type { CycleComponent } from "../../types/common/CycleComponent";
 import {
   CircleQuestionMark,
@@ -103,7 +98,7 @@ function ComponentLibraryView({ component }: ComponentLibraryProps) {
   const draggableStyle = transform
     ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: 99999,
+        zIndex: 1,
         position: "absolute" as const, // Use absolute instead of fixed
         width: libraryWidth, // Preserve the original width
       }
