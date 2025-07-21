@@ -5,10 +5,12 @@ export type CycleComponent = {
   compId: string;
   duration: number;
   motorConfig?: {
+    repeatTimes: number;
+
     pattern: Array<{
       stepTime: number;
       pauseTime: number;
-      repeatTimes: number;
+      direction: string;
     }>;
     runningStyle: string;
   };

@@ -1,7 +1,9 @@
 const API_URL = "http://localhost:4000"; // Adjust if your backend runs elsewhere
 
 export async function fetchAllWasherCycles() {
-  const res = await fetch(`${API_URL}/api/washer-cycles`);
+  const res = await fetch(
+    `${API_URL}/api/washer-cycles?sortBy=created_at&order=desc`
+  );
   if (!res.ok) throw new Error("Failed to fetch washer cycles");
   return res.json();
 }
@@ -10,6 +12,7 @@ export async function createWasherCycle(cycle: {
   id: string;
   displayName: string;
   data: any;
+  engineer_note?: string | null; // Optional field for engineer notes
 }) {
   const res = await fetch(`${API_URL}/api/washer-cycles`, {
     method: "POST",
@@ -18,6 +21,45 @@ export async function createWasherCycle(cycle: {
   });
   if (!res.ok) throw new Error("Failed to create washer cycle");
   return res.json();
+}
+
+export async function addNewCycle(cycleName?: string) {
+  const newCycleTemplate = {
+    name: cycleName || "New Test Cycle",
+    phases: [
+      {
+        id: "phase_a",
+        name: "Example Phase",
+        color: "06B6D4",
+        startTime: 0,
+        components: [
+          {
+            id: "1752779020217",
+            label: "Quick Drain",
+            start: 0,
+            compId: "Drain Valve",
+            duration: 5000,
+            motorConfig: null,
+          },
+        ],
+      },
+    ],
+  };
+
+  const cycleData = {
+    id: `cycle_${Date.now()}`, // Generate unique ID
+    displayName: newCycleTemplate.name,
+    data: newCycleTemplate,
+    engineer_note: "Notes for this cycle can be added here",
+  };
+
+  try {
+    const result = await createWasherCycle(cycleData);
+    return result;
+  } catch (error) {
+    console.error("Failed to add new cycle:", error);
+    throw error;
+  }
 }
 
 export async function deleteWasherCycle(id: string) {

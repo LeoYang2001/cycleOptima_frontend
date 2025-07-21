@@ -131,7 +131,7 @@ function PhaseEditor() {
             width: "60%",
             height: selectedComponent?.compId.startsWith("Motor")
               ? "80%"
-              : "60%",
+              : "30%",
             borderWidth: 1,
             borderColor: "#333",
           }}
@@ -345,6 +345,7 @@ function PhaseEditor() {
         <ComponentEditor
           setComponents={setComponents}
           component={selectedComponent}
+          onClose={handleRemoveModal}
         />
       </Modal>
     </div>

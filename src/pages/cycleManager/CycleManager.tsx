@@ -10,6 +10,7 @@ import { getSemanticSearchResults } from "../../utils/semanticSearch";
 import { X } from "lucide-react"; // Add this import at the top with other imports
 import { ClipLoader, PuffLoader } from "react-spinners";
 import CycleFile from "../../components/cycleManager/CycleFile";
+import { addNewCycle } from "../../apis/cycles";
 
 const statusOptions = ["all status", "draft", "tested"];
 const CYCLES_PER_PAGE = 30; // 6 cols * 5 rows
@@ -22,7 +23,56 @@ function CycleManager() {
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [searchPrompt, setSearchPrompt] = useState("");
+  const [isAddingCycle, setIsAddingCycle] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newCycleName, setNewCycleName] = useState("");
   const cycles = useSelector((state: RootState) => state.cycles.cycles);
+
+  // Handler for opening add new cycle modal
+  const handleAddNewCycle = () => {
+    setShowAddModal(true);
+    setNewCycleName(""); // Reset the input
+  };
+
+  // Handler for submitting the new cycle form
+  const handleSubmitNewCycle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCycleName.trim()) return;
+
+    // Check for duplicate cycle names
+    const trimmedName = newCycleName.trim();
+    const isDuplicate = cycles.some(
+      (cycle) => cycle.displayName?.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (isDuplicate) {
+      alert(
+        `A cycle with the name "${trimmedName}" already exists. Please choose a different name.`
+      );
+      return;
+    }
+
+    setIsAddingCycle(true);
+    setShowAddModal(false);
+
+    try {
+      const result = await addNewCycle(trimmedName);
+      console.log("New cycle created:", result);
+      // You might want to refresh the cycles list here or dispatch an action
+    } catch (error) {
+      console.error("Failed to create new cycle:", error);
+      alert("Failed to create new cycle: " + (error as Error).message);
+    } finally {
+      setIsAddingCycle(false);
+      setNewCycleName("");
+    }
+  };
+
+  // Handler for canceling the add new cycle modal
+  const handleCancelAddCycle = () => {
+    setShowAddModal(false);
+    setNewCycleName("");
+  };
 
   // Search handler (semantic search on submit)
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -125,7 +175,12 @@ function CycleManager() {
             </div>
           )}
         </div>
-        <Button theme="light" label="Add New Cycle" icon={PlusIcon} />
+        <Button
+          func={handleAddNewCycle}
+          theme="dark"
+          label="Add New Cycle"
+          icon={PlusIcon}
+        />
       </div>
 
       {/* Render cycles in a 6x5 grid */}
@@ -154,12 +209,22 @@ function CycleManager() {
             {pagedCycles.map((cycle) => (
               <CycleFile cycle={cycle} key={cycle.id} />
             ))}
-            {/* Fill empty cells if not enough cycles for the last page */}
-            {Array.from({ length: CYCLES_PER_PAGE - pagedCycles.length }).map(
-              (_, idx) => (
-                <div key={`empty-${idx}`} />
-              )
+            {/* Add skeleton when adding new cycle */}
+            {isAddingCycle && (
+              <div className="bg-gray-800 rounded-lg p-4 animate-pulse">
+                <div className="h-4 bg-gray-700 rounded mb-2"></div>
+                <div className="h-3 bg-gray-700 rounded w-3/4 mb-2"></div>
+                <div className="h-2 bg-gray-700 rounded w-1/2"></div>
+                <div className="mt-4 h-8 bg-gray-700 rounded"></div>
+              </div>
             )}
+            {/* Fill empty cells if not enough cycles for the last page */}
+            {Array.from({
+              length:
+                CYCLES_PER_PAGE - pagedCycles.length - (isAddingCycle ? 1 : 0),
+            }).map((_, idx) => (
+              <div key={`empty-${idx}`} />
+            ))}
           </div>
         )}
       </section>
@@ -182,6 +247,61 @@ function CycleManager() {
             func={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
           />
+        </div>
+      )}
+
+      {/* Add New Cycle Modal */}
+      {showAddModal && (
+        <div
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+          }}
+          className="fixed inset-0  flex items-center justify-center z-50"
+          onClick={handleCancelAddCycle}
+        >
+          <div
+            style={{
+              backgroundColor: "#27272a",
+            }}
+            className=" rounded-lg p-6 w-96 max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Add New Cycle
+            </h2>
+            <form onSubmit={handleSubmitNewCycle}>
+              <div className="mb-4">
+                <label className="block text-gray-300 text-sm font-medium mb-2">
+                  Cycle Name
+                </label>
+                <input
+                  type="text"
+                  value={newCycleName}
+                  onChange={(e) => setNewCycleName(e.target.value)}
+                  placeholder="Enter cycle name"
+                  style={{
+                    backgroundColor: "#18181b",
+                    borderRadius: 4,
+                    border: "1px solid #333",
+                  }}
+                  className="w-full h-10 bg-transparent text-white p-2 my-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  style={{
+                    backgroundColor: "#3b82f6",
+                  }}
+                  className="px-4 py-2 text-white rounded hover:bg-blue-700 transition-colors"
+                >
+                  Create Cycle
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
