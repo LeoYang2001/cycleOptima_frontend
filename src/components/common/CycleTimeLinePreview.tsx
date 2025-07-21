@@ -30,7 +30,7 @@ interface CycleTimeLinePreviewProp {
   size?: string;
   func?: () => void;
   phases?: Phase[]; // Optional prop for phases
-  setPhases: React.Dispatch<React.SetStateAction<Phase[]>>; // Optional prop for setting phases
+  setPhases?: React.Dispatch<React.SetStateAction<Phase[]>>; // Optional prop for setting phases
 }
 
 export const colorMap = ["#4ADE80", "#60A5FA", "#FBBF24", "#F87171"]; // green, blue, yellow, red
@@ -44,7 +44,7 @@ function CycleTimeLinePreview({
   size = "small",
   func = () => {},
   phases = cycle.data.phases || [], // Default to cycle phases if not provided
-  setPhases,
+  setPhases = () => {}, // Default no-op function
 }: CycleTimeLinePreviewProp) {
   const { totalCycleDuration, phaseDurations } = calculateCycleDurations(cycle);
   const phases_progress = calculatePhasePortions(

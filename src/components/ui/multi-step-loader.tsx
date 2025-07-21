@@ -107,7 +107,7 @@ export const MultiStepLoader = ({
       setCurrentState(0);
       return;
     }
-    const timeout = setTimeout(() => {
+    const timeout: ReturnType<typeof setTimeout> = setTimeout(() => {
       setCurrentState((prevState) =>
         loop
           ? prevState === loadingStates.length - 1
