@@ -1,6 +1,6 @@
 import type { CycleComponent } from "../types/common/CycleComponent";
 
-const API_URL = "http://localhost:4000";
+const API_URL = "http://192.168.10.73:4000";
 
 export async function fetchLibraryComponents(): Promise<CycleComponent[]> {
   const res = await fetch(`${API_URL}/api/library`);

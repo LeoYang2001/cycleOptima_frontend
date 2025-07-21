@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:4000"; // Adjust if your backend runs elsewhere
+const API_URL = "http://192.168.10.73:4000"; // Adjust if your backend runs elsewhere
 
 export async function fetchAllWasherCycles() {
   const res = await fetch(
