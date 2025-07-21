@@ -188,8 +188,6 @@ function ComponentTimeline({
     Number(percentageData.pauseTime)
   );
 
-  console.log("ticks:", ticks);
-
   let maskStyle = {
     zIndex: -1,
     backgroundColor: "#3673d9",
@@ -213,40 +211,6 @@ function ComponentTimeline({
 
   return (
     <div ref={setNodeRef} className=" w-full h-full flex flex-col pt-10 ">
-      {/* <div className="mb-4 p-3 bg-gray-800 rounded-lg text-white text-sm">
-        <div className="grid grid-cols-2 gap-4 mb-2">
-          <div>
-            <span className="text-gray-400">Total Phase Duration: </span>
-            <span className="font-semibold">
-              {percentageData.totalPhaseDuration}ms
-            </span>
-          </div>
-          <div>
-            <span className="text-gray-400">Active Duration: </span>
-            <span className="font-semibold">
-              {percentageData.activeDuration}ms
-            </span>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <span className="text-yellow-400">Pause Time: </span>
-            <span className="font-semibold">{percentageData.pauseTime}ms</span>
-            <span className="text-yellow-400 ml-2">
-              ({percentageData.pauseTimePercentage.toFixed(1)}%)
-            </span>
-          </div>
-          <div>
-            <span className="text-green-400">Active Time: </span>
-            <span className="font-semibold">
-              {percentageData.activeDuration}ms
-            </span>
-            <span className="text-green-400 ml-2">
-              ({percentageData.activeDurationPercentage.toFixed(1)}%)
-            </span>
-          </div>
-        </div>
-      </div> */}
       <div style={{}} className="w-full h-full  rounded-lg relative ">
         {components.length === 0 && !isDragging && (
           <div
@@ -287,7 +251,7 @@ function ComponentTimeline({
             }}
             className="absolute w-full h-full flex flex-row z-1"
           >
-            {startTime && (
+            {startTime ? (
               <div
                 className="   bg-transparent border-r-1 h-full"
                 style={{
@@ -311,6 +275,8 @@ function ComponentTimeline({
                   {ticks[0].label}
                 </span>
               </div>
+            ) : (
+              ""
             )}
             <div className=" flex-1 flex h-full bg-transparent   flex-row ">
               {ticks.slice(1, -1).map((tick, index) => {

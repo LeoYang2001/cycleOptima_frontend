@@ -8,6 +8,7 @@ import { formatTimeLabel } from "../../utils/formatTime";
 import { calculateCycleDurations } from "../../utils/totalDuration";
 import CycleTag from "../../pages/cycleManager/CycleTag";
 import { deleteWasherCycle } from "../../apis/cycles";
+import TimeTag from "../../pages/cycleManager/TimeTag";
 
 interface CycleFileProps {
   cycle: Cycle;
@@ -48,9 +49,13 @@ function CycleFile({ cycle }: CycleFileProps) {
             borderColor: "#333333",
           }}
         >
-          <span className="font-semibold text-white text-xl">
-            {cycle.displayName}
-          </span>
+          <div className="flex flex-row items-center justify-between w-full  mb-3">
+            <span className="font-semibold text-white text-xl">
+              {cycle.displayName}
+            </span>
+            <CycleTag ifTested={cycle.status === "tested"} />
+          </div>
+
           {/* engineer note  */}
           <div className="w-full relative">
             <div
@@ -74,7 +79,9 @@ function CycleFile({ cycle }: CycleFileProps) {
             >
               <Trash2 size={18} />
             </div>
-            <CycleTag ifTested={cycle.status === "tested"} />
+            <div className="flex flex-row items-center gap-2">
+              <TimeTag createdAt={cycle.created_at} />
+            </div>
           </div>
         </div>
       </div>

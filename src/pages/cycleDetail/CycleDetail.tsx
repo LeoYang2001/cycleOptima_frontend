@@ -2,9 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
 import { useParams } from "react-router-dom";
-import type { Cycle } from "../../types/common/Cycle";
-import Button from "../../components/common/Button";
-import { Logs, Pencil, Play, SaveIcon } from "lucide-react";
+import { Logs, Play, X, Palette } from "lucide-react";
 import Note from "../../components/cycleDetail/Note";
 import Section from "../../components/common/Section";
 import CycleTimeLinePreview from "../../components/common/CycleTimeLinePreview";
@@ -40,6 +38,11 @@ function CycleDetail() {
     cycle?.engineer_note || ""
   );
   const [isSaving, setIsSaving] = useState(false);
+
+  // Phase creation modal state
+  const [showPhaseModal, setShowPhaseModal] = useState(false);
+  const [newPhaseName, setNewPhaseName] = useState("");
+  const [newPhaseColor, setNewPhaseColor] = useState("4ADE80");
 
   // Manual save trigger (for save button) - defined early so useEffect can reference it
   const handleSave = async () => {
@@ -116,12 +119,22 @@ function CycleDetail() {
     );
   };
 
-  // Add phase (optimistic update)
+  // Add phase (open modal)
   const addPhase = () => {
+    setShowPhaseModal(true);
+  };
+
+  // Handle phase creation from modal
+  const handleCreatePhase = () => {
+    if (!newPhaseName.trim()) {
+      alert("Phase name cannot be empty. Please enter a valid phase name.");
+      return;
+    }
+
     const newPhase = {
       id: Date.now().toString(),
-      name: "Untitled",
-      color: "ccc",
+      name: newPhaseName.trim(),
+      color: `${newPhaseColor}`,
       startTime: 10000,
       components: [],
     };
@@ -132,6 +145,18 @@ function CycleDetail() {
         phase: newPhase,
       })
     );
+
+    // Reset modal state
+    setShowPhaseModal(false);
+    setNewPhaseName("");
+    setNewPhaseColor("4ADE80");
+  };
+
+  // Close modal without creating phase
+  const handleClosePhaseModal = () => {
+    setShowPhaseModal(false);
+    setNewPhaseName("");
+    setNewPhaseColor("4ADE80");
   };
 
   // Delete phase (optimistic update)
@@ -273,6 +298,149 @@ function CycleDetail() {
         </div>
       </section>
       {/* Render more details here */}
+
+      {/* Phase Creation Modal */}
+      {showPhaseModal && (
+        <div
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          onClick={handleClosePhaseModal}
+        >
+          {/* Modal Content */}
+          <div
+            style={{
+              backgroundColor: "#27272a",
+            }}
+            className="rounded-lg p-6 w-96 max-w-md mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Palette className="text-blue-400" size={20} />
+                <h2 className="text-xl font-semibold text-white">
+                  Create New Phase
+                </h2>
+              </div>
+              <button
+                onClick={handleClosePhaseModal}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <div className="space-y-4">
+              {/* Phase Name */}
+              <div className="mb-4">
+                <label className="block text-gray-300 text-sm font-medium mb-2">
+                  Phase Name
+                </label>
+                <input
+                  type="text"
+                  value={newPhaseName}
+                  onChange={(e) => setNewPhaseName(e.target.value)}
+                  placeholder="Enter phase name..."
+                  style={{
+                    backgroundColor: "#18181b",
+                    borderRadius: 4,
+                    border: "1px solid #333",
+                  }}
+                  className="w-full h-10 bg-transparent text-white p-2 my-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  autoFocus
+                />
+              </div>
+
+              {/* Color Selection */}
+              <div className="mb-4">
+                <label className="block text-gray-300 text-sm font-medium mb-2">
+                  Phase Color
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={`#${newPhaseColor}`}
+                    onChange={(e) =>
+                      setNewPhaseColor(e.target.value.substring(1))
+                    }
+                    style={{
+                      backgroundColor: "#18181b",
+                      borderRadius: 4,
+                      border: "1px solid #333",
+                    }}
+                    className="w-12 h-10 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={newPhaseColor}
+                    onChange={(e) =>
+                      setNewPhaseColor(e.target.value.replace("#", ""))
+                    }
+                    placeholder="4ADE80"
+                    style={{
+                      backgroundColor: "#18181b",
+                      borderRadius: 4,
+                      border: "1px solid #333",
+                    }}
+                    className="flex-1 h-10 bg-transparent text-white p-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+              </div>
+
+              {/* Predefined Colors */}
+              <div className="mb-4">
+                <label className="block text-gray-300 text-sm font-medium mb-2">
+                  Quick Colors
+                </label>
+                <div className="grid grid-cols-6 gap-2">
+                  {[
+                    "4ADE80", // Green
+                    "3B82F6", // Blue
+                    "F59E0B", // Yellow
+                    "EF4444", // Red
+                    "8B5CF6", // Purple
+                    "06B6D4", // Cyan
+                    "F97316", // Orange
+                    "EC4899", // Pink
+                    "84CC16", // Lime
+                    "6366F1", // Indigo
+                    "14B8A6", // Teal
+                    "F43F5E", // Rose
+                  ].map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setNewPhaseColor(color)}
+                      className={`w-8 h-8 rounded border-2 ${
+                        newPhaseColor === color
+                          ? "border-white"
+                          : "border-gray-600"
+                      } hover:border-gray-400 transition-colors cursor-pointer`}
+                      style={{ backgroundColor: `#${color}` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={handleCreatePhase}
+                disabled={!newPhaseName.trim()}
+                style={{
+                  backgroundColor: "#3b82f6",
+                }}
+                className="px-4 py-2 text-white rounded hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+              >
+                Create Phase
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

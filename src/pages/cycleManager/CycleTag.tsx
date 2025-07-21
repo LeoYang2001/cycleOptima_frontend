@@ -13,7 +13,7 @@ function CycleTag({ ifTested }: CycleTagProp) {
       style={{
         backgroundColor: bgColor,
       }}
-      className=" flex flex-row items-center gap-1 p-1 px-3  rounded-full"
+      className=" flex flex-row items-center gap-1 p-1 px-3   rounded-full"
     >
       <Tag color={textColor} size={16 * sizeScale} />
       <span

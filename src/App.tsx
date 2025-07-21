@@ -20,7 +20,7 @@ function App() {
   useEffect(() => {
     dispatch(fetchCycles());
     dispatch(fetchLibrary());
-    const socket = io("http://localhost:4000");
+    const socket = io("http://192.168.10.73:4000");
     socket.on("cycle_updated", () => {
       dispatch(fetchCycles()); // Refetch when notified
     });
