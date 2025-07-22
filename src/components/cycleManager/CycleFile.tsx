@@ -9,6 +9,9 @@ import { calculateCycleDurations } from "../../utils/totalDuration";
 import CycleTag from "../../pages/cycleManager/CycleTag";
 import { deleteWasherCycle } from "../../apis/cycles";
 import TimeTag from "../../pages/cycleManager/TimeTag";
+import { useDispatch } from "react-redux";
+import type { AppDispatch } from "../../store";
+import { fetchCycles } from "../../store/cycleSlice";
 
 interface CycleFileProps {
   cycle: Cycle;
@@ -16,6 +19,7 @@ interface CycleFileProps {
 
 function CycleFile({ cycle }: CycleFileProps) {
   const { totalCycleDuration, phaseDurations } = calculateCycleDurations(cycle);
+  const dispatch = useDispatch<AppDispatch>();
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -27,6 +31,8 @@ function CycleFile({ cycle }: CycleFileProps) {
     try {
       await deleteWasherCycle(cycle.id);
       console.log("Deleted successfully");
+      // Refresh the cycles list
+      dispatch(fetchCycles());
     } catch (err) {
       alert("Failed to delete cycle.");
     }

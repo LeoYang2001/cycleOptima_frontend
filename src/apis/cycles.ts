@@ -1,11 +1,21 @@
 const API_URL = "https://bd81fefc95be.ngrok-free.app"; // Adjust if your backend runs elsewhere
 
 export async function fetchAllWasherCycles() {
+  console.log("fetching all washer cycles");
   const res = await fetch(
-    `${API_URL}/api/washer-cycles?sortBy=created_at&order=desc`
+    `${API_URL}/api/washer-cycles?sortBy=created_at&order=desc`,
+    {
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+    }
   );
+  console.log(`${API_URL}/api/washer-cycles?sortBy=created_at&order=desc`);
   if (!res.ok) throw new Error("Failed to fetch washer cycles");
-  return res.json();
+
+  const data = await res.json();
+  console.log("res.json()", data);
+  return data;
 }
 
 export async function createWasherCycle(cycle: {
@@ -16,7 +26,10 @@ export async function createWasherCycle(cycle: {
 }) {
   const res = await fetch(`${API_URL}/api/washer-cycles`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true",
+    },
     body: JSON.stringify(cycle),
   });
   if (!res.ok) throw new Error("Failed to create washer cycle");
@@ -66,6 +79,9 @@ export async function deleteWasherCycle(id: string) {
   try {
     const res = await fetch(`${API_URL}/api/washer-cycles/delete/${id}`, {
       method: "DELETE",
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
     });
 
     if (!res.ok) {
@@ -92,7 +108,10 @@ export async function updateWasherCycle(
   try {
     const res = await fetch(`${API_URL}/api/washer-cycles/${id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
       body: JSON.stringify(cycle),
     });
 
@@ -118,7 +137,10 @@ export async function upsertWasherCycle(cycle: {
   try {
     const res = await fetch(`${API_URL}/api/washer-cycles/upsert`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
       body: JSON.stringify(cycle),
     });
 

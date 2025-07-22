@@ -3,14 +3,15 @@ import { PlaceholdersAndVanishInput } from "../../components/ui/placeholders-and
 import Button from "../../components/common/Button";
 import { PlusIcon } from "lucide-react";
 import Dropdown from "../../components/common/Dropdown";
-import { useSelector } from "react-redux";
-import type { RootState } from "../../store";
+import { useSelector, useDispatch } from "react-redux";
+import type { RootState, AppDispatch } from "../../store";
 import { getEmbedding } from "../../apis/embedText";
 import { getSemanticSearchResults } from "../../utils/semanticSearch";
 import { X } from "lucide-react"; // Add this import at the top with other imports
 import { ClipLoader, PuffLoader } from "react-spinners";
 import CycleFile from "../../components/cycleManager/CycleFile";
 import { addNewCycle } from "../../apis/cycles";
+import { fetchCycles } from "../../store/cycleSlice";
 
 const statusOptions = ["all status", "draft", "tested"];
 const CYCLES_PER_PAGE = 30; // 6 cols * 5 rows
@@ -27,6 +28,7 @@ function CycleManager() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCycleName, setNewCycleName] = useState("");
   const cycles = useSelector((state: RootState) => state.cycles.cycles);
+  const dispatch = useDispatch<AppDispatch>();
 
   // Handler for opening add new cycle modal
   const handleAddNewCycle = () => {
@@ -58,7 +60,8 @@ function CycleManager() {
     try {
       const result = await addNewCycle(trimmedName);
       console.log("New cycle created:", result);
-      // You might want to refresh the cycles list here or dispatch an action
+      // Refresh the cycles list
+      dispatch(fetchCycles());
     } catch (error) {
       console.error("Failed to create new cycle:", error);
       alert("Failed to create new cycle: " + (error as Error).message);

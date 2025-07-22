@@ -13,6 +13,7 @@ import { fetchLibrary } from "./store/librarySlice";
 import { io } from "socket.io-client";
 import CycleDetail from "./pages/cycleDetail/CycleDetail";
 import PhaseEditor from "./pages/phaseEditor/PhaseEditor";
+import "./utils/testSocket"; // Import test utility
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -20,8 +21,40 @@ function App() {
   useEffect(() => {
     dispatch(fetchCycles());
     dispatch(fetchLibrary());
-    const socket = io("https://bd81fefc95be.ngrok-free.app");
+
+    const socket = io("https://bd81fefc95be.ngrok-free.app", {
+      transports: ["websocket", "polling"],
+      extraHeaders: {
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
+
+    // Connection event handlers
+    socket.on("connect", () => {
+      console.log("✅ Socket.io connected:", socket.id);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("❌ Socket.io disconnected:", reason);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("🔥 Socket.io connection error:", error);
+    });
+
+    // Listen for cycle events
     socket.on("cycle_updated", () => {
+      console.log("🔄 Received cycle_updated event, refetching cycles...");
+      dispatch(fetchCycles()); // Refetch when notified
+    });
+
+    socket.on("cycle_created", () => {
+      console.log("🆕 Received cycle_created event, refetching cycles...");
+      dispatch(fetchCycles()); // Refetch when notified
+    });
+
+    socket.on("cycle_deleted", () => {
+      console.log("🗑️ Received cycle_deleted event, refetching cycles...");
       dispatch(fetchCycles()); // Refetch when notified
     });
 
