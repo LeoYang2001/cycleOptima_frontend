@@ -3,7 +3,7 @@ import MainLayout from "./MainLayout";
 import AiAssistant from "./pages/aiAssistant/AiAssistant";
 import CycleManager from "./pages/cycleManager/CycleManager";
 import Home from "./pages/Home";
-import { Route, BrowserRouter, Routes } from "react-router-dom";
+import { Route, BrowserRouter, Routes, Navigate } from "react-router-dom";
 import SystemMonitor from "./pages/monitor/SystemMonitor";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "./store";
@@ -73,6 +73,8 @@ function App() {
           <Route path="system-monitor" element={<SystemMonitor />} />
           <Route path="/cycle/:id" element={<CycleDetail />} />
           <Route path="/cycle/:id/phase/:phaseId" element={<PhaseEditor />} />
+          {/* Catch-all route - redirect any unmatched routes to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

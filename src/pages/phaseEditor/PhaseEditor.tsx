@@ -43,9 +43,14 @@ function PhaseEditor() {
 
   // Handle cases where parameters might be undefined
   if (!cycleId || !phaseId) {
+    useEffect(() => {
+      console.log("Missing cycle ID or phase ID, redirecting to home");
+      navigate("/", { replace: true });
+    }, [navigate]);
+
     return (
-      <div className="text-red-500">
-        Error: Missing cycle ID or phase ID in URL
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Invalid URL, redirecting...</div>
       </div>
     );
   }
@@ -53,7 +58,46 @@ function PhaseEditor() {
   const cycle = useSelector((state: RootState) =>
     selectCycleById(state, cycleId!)
   );
+  const cycles = useSelector((state: RootState) => state.cycles.cycles);
+  const cyclesLoading = useSelector((state: RootState) => state.cycles.loading);
   const phase = cycle?.data.phases.find((p) => p.id === phaseId);
+
+  // Check if cycle or phase exists and redirect if not found
+  useEffect(() => {
+    if (!cyclesLoading && cycles.length > 0) {
+      if (!cycle) {
+        console.log(`Cycle with ID ${cycleId} not found, redirecting to home`);
+        navigate("/", { replace: true });
+      } else if (!phase) {
+        console.log(
+          `Phase with ID ${phaseId} not found, redirecting to cycle detail`
+        );
+        navigate(`/cycle/${cycleId}`, { replace: true });
+      }
+    }
+  }, [cycle, phase, cycles, cyclesLoading, cycleId, phaseId, navigate]);
+
+  // Show loading state while cycles are being fetched
+  if (cyclesLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    );
+  }
+
+  // Show redirecting message if cycle or phase not found
+  if (!cycle || !phase) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">
+          {!cycle
+            ? "Cycle not found, redirecting..."
+            : "Phase not found, redirecting..."}
+        </div>
+      </div>
+    );
+  }
 
   const libraryComponents = useSelector((state: RootState) =>
     selectAllLibraryComponents(state)

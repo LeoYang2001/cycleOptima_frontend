@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Logs, Play, X, Palette } from "lucide-react";
 import Note from "../../components/cycleDetail/Note";
 import Section from "../../components/common/Section";
@@ -21,9 +21,12 @@ import {
 function CycleDetail() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
 
   // Get cycle from Redux store
   const cycle = useSelector((state: RootState) => selectCycleById(state, id!));
+  const cycles = useSelector((state: RootState) => state.cycles.cycles);
+  const cyclesLoading = useSelector((state: RootState) => state.cycles.loading);
 
   // Set up auto-sync (disabled for manual control)
   const { pendingCount, triggerSync } = useAutoSync({
@@ -92,9 +95,31 @@ function CycleDetail() {
     }
   }, [pendingCount, isSaving]);
 
+  // Check if cycle exists and redirect to home if not found (after cycles are loaded)
+  useEffect(() => {
+    if (!cyclesLoading && cycles.length > 0 && !cycle && id) {
+      console.log(`Cycle with ID ${id} not found, redirecting to home`);
+      navigate("/", { replace: true });
+    }
+  }, [cycle, cycles, cyclesLoading, id, navigate]);
+
+  // Show loading state while cycles are being fetched
+  if (cyclesLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading cycle...</div>
+      </div>
+    );
+  }
+
   // NOW we can do conditional returns after all hooks are declared
   if (!cycle) {
-    return <div className="text-red-500">Cycle not found</div>;
+    // This will trigger the useEffect above to redirect to home
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Cycle not found, redirecting...</div>
+      </div>
+    );
   }
 
   // Update cycle name in Redux (optimistic)
