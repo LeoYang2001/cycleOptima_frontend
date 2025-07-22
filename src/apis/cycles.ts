@@ -1,4 +1,4 @@
-const API_URL = "http://192.168.10.73:4000"; // Adjust if your backend runs elsewhere
+const API_URL = "https://bd81fefc95be.ngrok-free.app"; // Adjust if your backend runs elsewhere
 
 export async function fetchAllWasherCycles() {
   const res = await fetch(

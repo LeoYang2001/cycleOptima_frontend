@@ -11,7 +11,7 @@ async function getOpenAiApiKey(): Promise<string> {
 
   try {
     const response = await fetch(
-      "http://192.168.10.73:4000/api/config/openai-key"
+      "https://bd81fefc95be.ngrok-free.app/api/config/openai-key"
     );
     const data = await response.json();
 
