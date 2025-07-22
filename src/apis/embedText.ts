@@ -10,9 +10,11 @@ async function getOpenAiApiKey(): Promise<string> {
   }
 
   try {
-    const response = await fetch("http://192.168.10.73:4000/api/config/openai-key");
+    const response = await fetch(
+      "http://192.168.10.73:4000/api/config/openai-key"
+    );
     const data = await response.json();
-    
+
     if (data.success && data.data?.openai_api_key) {
       cachedApiKey = data.data.openai_api_key;
       return cachedApiKey as string;
@@ -20,7 +22,9 @@ async function getOpenAiApiKey(): Promise<string> {
       throw new Error("Failed to get OpenAI API key from backend");
     }
   } catch (error) {
-    throw new Error(`Failed to fetch OpenAI API key: ${(error as Error).message}`);
+    throw new Error(
+      `Failed to fetch OpenAI API key: ${(error as Error).message}`
+    );
   }
 }
 
