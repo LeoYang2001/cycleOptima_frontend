@@ -1,11 +1,45 @@
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true, // Required for browser usage, but not recommended for production!
-});
+// Cache for the API key to avoid repeated requests
+let cachedApiKey: string | null = null;
+
+// Function to fetch OpenAI API key from backend
+async function getOpenAiApiKey(): Promise<string> {
+  if (cachedApiKey) {
+    return cachedApiKey;
+  }
+
+  try {
+    const response = await fetch("http://192.168.10.73:4000/api/config/openai-key");
+    const data = await response.json();
+    
+    if (data.success && data.data?.openai_api_key) {
+      cachedApiKey = data.data.openai_api_key;
+      return cachedApiKey as string;
+    } else {
+      throw new Error("Failed to get OpenAI API key from backend");
+    }
+  } catch (error) {
+    throw new Error(`Failed to fetch OpenAI API key: ${(error as Error).message}`);
+  }
+}
+
+// Initialize OpenAI client lazily
+let openaiClient: OpenAI | null = null;
+
+async function getOpenAiClient(): Promise<OpenAI> {
+  if (!openaiClient) {
+    const apiKey = await getOpenAiApiKey();
+    openaiClient = new OpenAI({
+      apiKey: apiKey,
+      dangerouslyAllowBrowser: true, // Required for browser usage, but not recommended for production!
+    });
+  }
+  return openaiClient;
+}
 
 export async function getEmbedding(text: string): Promise<number[]> {
+  const openai = await getOpenAiClient();
   const embedding = await openai.embeddings.create({
     model: "text-embedding-3-small",
     input: text,

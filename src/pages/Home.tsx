@@ -43,7 +43,7 @@ function Home() {
         </div>
         <div className=" flex flex-row  mt-10">
           {navigationCardList.map((navCard) => (
-            <NavigationCard navCard={navCard} />
+            <NavigationCard key={navCard.url} navCard={navCard} />
           ))}
         </div>
       </div>
