@@ -11,7 +11,12 @@ async function getOpenAiApiKey(): Promise<string> {
 
   try {
     const response = await fetch(
-      "https://bd81fefc95be.ngrok-free.app/api/config/openai-key"
+      "https://bd81fefc95be.ngrok-free.app/api/config/openai-key",
+      {
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+        },
+      }
     );
     const data = await response.json();
 

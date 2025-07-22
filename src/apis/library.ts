@@ -3,17 +3,40 @@ import type { CycleComponent } from "../types/common/CycleComponent";
 const API_URL = "https://bd81fefc95be.ngrok-free.app";
 
 export async function fetchLibraryComponents(): Promise<CycleComponent[]> {
-  const res = await fetch(`${API_URL}/api/library`);
-  if (!res.ok) throw new Error("Failed to fetch library components");
-  const data = await res.json();
+  try {
+    const res = await fetch(`${API_URL}/api/library`, {
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
 
-  // Transform the API response to match CycleComponent interface
-  return data.map((item: any) => ({
-    id: item.id,
-    label: item.label,
-    start: 0, // Library components don't have a start time, default to 0
-    compId: item.compId,
-    duration: item.duration,
-    motorConfig: item.motorConfig,
-  }));
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(
+        "Library fetch failed:",
+        res.status,
+        res.statusText,
+        errorText
+      );
+      throw new Error(
+        `Failed to fetch library components: ${res.status} ${res.statusText}`
+      );
+    }
+
+    const data = await res.json();
+    console.log("Library components fetched successfully:", data);
+
+    // Transform the API response to match CycleComponent interface
+    return data.map((item: any) => ({
+      id: item.id,
+      label: item.label,
+      start: 0, // Library components don't have a start time, default to 0
+      compId: item.compId,
+      duration: item.duration,
+      motorConfig: item.motorConfig,
+    }));
+  } catch (error) {
+    console.error("Failed to fetch library components:", error);
+    throw error;
+  }
 }
