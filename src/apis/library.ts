@@ -1,13 +1,10 @@
 import type { CycleComponent } from "../types/common/CycleComponent";
-
-const API_URL = "https://bd81fefc95be.ngrok-free.app";
+import { getApiUrl, getNgrokHeaders } from "../config/api";
 
 export async function fetchLibraryComponents(): Promise<CycleComponent[]> {
   try {
-    const res = await fetch(`${API_URL}/api/library`, {
-      headers: {
-        "ngrok-skip-browser-warning": "true",
-      },
+    const res = await fetch(getApiUrl("/api/library"), {
+      headers: getNgrokHeaders(),
     });
 
     if (!res.ok) {

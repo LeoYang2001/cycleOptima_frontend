@@ -1,16 +1,14 @@
-const API_URL = "https://bd81fefc95be.ngrok-free.app"; // Adjust if your backend runs elsewhere
+import { getApiUrl, getNgrokHeaders } from "../config/api";
 
 export async function fetchAllWasherCycles() {
   console.log("fetching all washer cycles");
   const res = await fetch(
-    `${API_URL}/api/washer-cycles?sortBy=created_at&order=desc`,
+    getApiUrl("/api/washer-cycles?sortBy=created_at&order=desc"),
     {
-      headers: {
-        "ngrok-skip-browser-warning": "true",
-      },
+      headers: getNgrokHeaders(),
     }
   );
-  console.log(`${API_URL}/api/washer-cycles?sortBy=created_at&order=desc`);
+  console.log(getApiUrl("/api/washer-cycles?sortBy=created_at&order=desc"));
   if (!res.ok) throw new Error("Failed to fetch washer cycles");
 
   const data = await res.json();
@@ -24,11 +22,11 @@ export async function createWasherCycle(cycle: {
   data: any;
   engineer_note?: string | null; // Optional field for engineer notes
 }) {
-  const res = await fetch(`${API_URL}/api/washer-cycles`, {
+  const res = await fetch(getApiUrl("/api/washer-cycles"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
+      ...getNgrokHeaders(),
     },
     body: JSON.stringify(cycle),
   });
@@ -77,11 +75,9 @@ export async function addNewCycle(cycleName?: string) {
 
 export async function deleteWasherCycle(id: string) {
   try {
-    const res = await fetch(`${API_URL}/api/washer-cycles/delete/${id}`, {
+    const res = await fetch(getApiUrl(`/api/washer-cycles/delete/${id}`), {
       method: "DELETE",
-      headers: {
-        "ngrok-skip-browser-warning": "true",
-      },
+      headers: getNgrokHeaders(),
     });
 
     if (!res.ok) {
@@ -106,11 +102,11 @@ export async function updateWasherCycle(
   }
 ) {
   try {
-    const res = await fetch(`${API_URL}/api/washer-cycles/${id}`, {
+    const res = await fetch(getApiUrl(`/api/washer-cycles/${id}`), {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
+        ...getNgrokHeaders(),
       },
       body: JSON.stringify(cycle),
     });
@@ -135,11 +131,11 @@ export async function upsertWasherCycle(cycle: {
   engineer_note?: string | null;
 }) {
   try {
-    const res = await fetch(`${API_URL}/api/washer-cycles/upsert`, {
+    const res = await fetch(getApiUrl("/api/washer-cycles/upsert"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
+        ...getNgrokHeaders(),
       },
       body: JSON.stringify(cycle),
     });

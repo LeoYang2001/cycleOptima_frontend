@@ -14,6 +14,7 @@ import { io } from "socket.io-client";
 import CycleDetail from "./pages/cycleDetail/CycleDetail";
 import PhaseEditor from "./pages/phaseEditor/PhaseEditor";
 import "./utils/testSocket"; // Import test utility
+import { API_CONFIG, getNgrokHeaders } from "./config/api";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -22,11 +23,9 @@ function App() {
     dispatch(fetchCycles());
     dispatch(fetchLibrary());
 
-    const socket = io("https://bd81fefc95be.ngrok-free.app", {
+    const socket = io(API_CONFIG.BASE_URL, {
       transports: ["websocket", "polling"],
-      extraHeaders: {
-        "ngrok-skip-browser-warning": "true",
-      },
+      extraHeaders: getNgrokHeaders(),
     });
 
     // Connection event handlers

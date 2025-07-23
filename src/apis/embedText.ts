@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { getApiUrl, getNgrokHeaders } from "../config/api";
 
 // Cache for the API key to avoid repeated requests
 let cachedApiKey: string | null = null;
@@ -10,14 +11,9 @@ async function getOpenAiApiKey(): Promise<string> {
   }
 
   try {
-    const response = await fetch(
-      "https://bd81fefc95be.ngrok-free.app/api/config/openai-key",
-      {
-        headers: {
-          "ngrok-skip-browser-warning": "true",
-        },
-      }
-    );
+    const response = await fetch(getApiUrl("/api/config/openai-key"), {
+      headers: getNgrokHeaders(),
+    });
     const data = await response.json();
 
     if (data.success && data.data?.openai_api_key) {

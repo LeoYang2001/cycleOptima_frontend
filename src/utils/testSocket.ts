@@ -1,14 +1,13 @@
 // Utility function to test Socket.io connection and events
 import { io } from "socket.io-client";
+import { API_CONFIG, getNgrokHeaders } from "../config/api";
 
 export function testSocketConnection() {
   console.log("🧪 Testing Socket.io connection...");
 
-  const socket = io("https://bd81fefc95be.ngrok-free.app", {
+  const socket = io(API_CONFIG.BASE_URL, {
     transports: ["websocket", "polling"],
-    extraHeaders: {
-      "ngrok-skip-browser-warning": "true",
-    },
+    extraHeaders: getNgrokHeaders(),
   });
 
   // Connection events
