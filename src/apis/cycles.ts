@@ -12,7 +12,7 @@ export async function fetchAllWasherCycles() {
   if (!res.ok) throw new Error("Failed to fetch washer cycles");
 
   const data = await res.json();
-  console.log("res.json()", data);
+  console.log("all cycles:", data);
   return data;
 }
 

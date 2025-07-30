@@ -41,6 +41,7 @@ function CycleDetail() {
     cycle?.engineer_note || ""
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
 
   // Phase creation modal state
   const [showPhaseModal, setShowPhaseModal] = useState(false);
@@ -65,6 +66,40 @@ function CycleDetail() {
     }
   };
 
+  // Manual run trigger (for run shortcut)
+  const handleRun = async () => {
+    try {
+      if (!cycle) {
+        return; // No cycle to run
+      }
+
+      setIsRunning(true);
+
+      const response = await fetch(
+        "https://cycleoptima-production.up.railway.app/api/esp/run-flash",
+        // "http://localhost:4000/api/esp/run-flash",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ cycleId: cycle.id }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `HTTP error! status: ${response.status}`);
+      }
+
+      setIsRunning(false);
+    } catch (error) {
+      console.error("Run failed:", error);
+      setIsRunning(false); // Reset loading state on error
+      alert(`Failed to run cycle: ${(error as Error).message}`);
+    }
+  };
+
   // Sync local state with Redux state when cycle changes
   useEffect(() => {
     if (cycle) {
@@ -82,11 +117,17 @@ function CycleDetail() {
           handleSave();
         }
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === "r") {
+        e.preventDefault();
+        if (!isRunning) {
+          handleRun();
+        }
+      }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [pendingCount, handleSave]);
+  }, [pendingCount, handleSave, isRunning, handleRun]);
 
   // Reset saving state when all changes are saved
   useEffect(() => {
@@ -246,6 +287,32 @@ function CycleDetail() {
             }}
           />
           <div className="flex items-center gap-4">
+            {/* Run Status Indicator */}
+            {isRunning ? (
+              <div className="flex items-center gap-3 bg-purple-900/20 border border-purple-600/30 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <Play className="w-3 h-3 text-purple-400 animate-pulse" />
+                  <span className="text-purple-300 text-sm font-medium">
+                    Running cycle...
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="flex items-center gap-3 bg-gray-900/20 border border-gray-600/30 rounded-lg px-3 py-2 hover:bg-gray-800/30 transition-colors cursor-pointer"
+                onClick={handleRun}
+              >
+                <div className="flex items-center gap-2">
+                  <Play className="w-3 h-3 text-gray-400" />
+                  <span className="text-gray-300 text-sm font-medium">
+                    Ready to run
+                  </span>
+                </div>
+                <span className="text-gray-400 text-xs opacity-70">Ctrl+R</span>
+              </div>
+            )}
+
+            {/* Save Status Indicator */}
             {isSaving ? (
               <div className="flex items-center gap-3 bg-blue-900/20 border border-blue-600/30 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
