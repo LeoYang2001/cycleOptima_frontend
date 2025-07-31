@@ -278,6 +278,7 @@ function PhaseEditor() {
           ...libraryComponent,
           id: Date.now().toString(),
         };
+
         setComponents((prev) => [...prev, newComponent]);
       }
     }
@@ -296,6 +297,36 @@ function PhaseEditor() {
     //   setSelectedComponent(null);
     //   setShowModal(false);
     // }
+  };
+
+  const autoCreateRetractor = (motorInfo: any) => {
+    if (!motorInfo) return;
+    let motorStart = motorInfo.start ?? 0;
+    const motorDuration = motorInfo.duration ?? 1000;
+    let retractorStart = Math.max(0, motorStart - 5000);
+    let retractorDuration = motorDuration + (motorStart - retractorStart);
+
+    // If motor starts before 5000ms, adjust motor to start at 5000ms and retractor to start at 0
+    if (motorStart < 5000) {
+      retractorStart = 0;
+      retractorDuration = motorDuration + 5000;
+      // Update the motor's start time in components
+      setComponents((prev: any[]) =>
+        prev.map((comp) =>
+          comp.id === motorInfo.id ? { ...comp, start: 5000 } : comp
+        )
+      );
+      motorStart = 5000;
+    }
+
+    const retractorComponent = {
+      id: Date.now().toString(),
+      compId: "Retractor",
+      label: "Retractor",
+      start: retractorStart,
+      duration: retractorDuration,
+    };
+    setComponents((prev: any[]) => [...prev, retractorComponent]);
   };
   return (
     <div
@@ -369,6 +400,7 @@ function PhaseEditor() {
                 setComponents={setComponents}
                 setSelectedComponent={setSelectedComponent}
                 onDeleteComponent={handleDeleteComponent}
+                autoCreateRetractor={autoCreateRetractor}
               />
             </Section>
           </div>

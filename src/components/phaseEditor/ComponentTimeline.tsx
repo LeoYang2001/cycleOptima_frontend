@@ -3,6 +3,7 @@ import type { CycleComponent } from "../../types/common/CycleComponent";
 import { useDroppable } from "@dnd-kit/core";
 import { getStyle } from "./ComponentLibrary";
 import { generateTicksWithStartTime } from "../../utils/generateTicks";
+import { Plus } from "lucide-react";
 
 interface ComponentViewProps {
   component: CycleComponent;
@@ -12,6 +13,7 @@ interface ComponentViewProps {
   runningPercentage: number;
   setSelectedComponent: (component: CycleComponent | null) => void; // Function to set selected component
   onDeleteComponent: (componentId: string) => void; // Function to delete component
+  autoCreateRetractor?: (motorInfo: CycleComponent) => void; // Pass motor info
 }
 
 function ComponentView({
@@ -19,7 +21,7 @@ function ComponentView({
   percentageOfTotal,
   percentageOfActive,
   startPercentage,
-  runningPercentage,
+  autoCreateRetractor = () => {}, // Default to empty function if not provided
   setSelectedComponent,
   onDeleteComponent,
 }: ComponentViewProps) {
@@ -34,6 +36,8 @@ function ComponentView({
 
   const showBoth = actualWidth >= minWidthForBoth;
   const showIconOnly = actualWidth >= minWidthForIcon && !showBoth;
+
+  const [hovered, setHovered] = React.useState(false);
 
   const handleClick = () => {
     setSelectedComponent(component);
@@ -75,11 +79,12 @@ function ComponentView({
       <div
         style={{
           width: `${percentageOfActive.toFixed(1)}%`,
-
           backgroundColor: compStyle.color,
         }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         className="group rounded p-2 h-full  relative flex cursor-pointer flex-row items-center hover:opacity-70 transition-opacity duration-200 justify-center gap-2 text-white text-sm overflow-hidden"
         title="Left-click to edit • Right-click to delete"
       >
@@ -95,19 +100,40 @@ function ComponentView({
         >
           <span className="sr-only">Right-click to delete</span>
         </div>
+
+        {/* Fade-in button for Motor */}
+        {component.compId === "Motor" && (
+          <button
+            className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2 py-1 text-xs rounded shadow-lg border border-yellow-400 hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-all duration-200 ${
+              hovered ? "opacity-100 scale-105" : "opacity-0 scale-95"
+            }`}
+            style={{
+              pointerEvents: hovered ? "auto" : "none",
+              background:
+                "linear-gradient(90deg, rgb(245,158,11) 0%, rgb(245,158,11,0.85) 100%)",
+            }}
+            title="Auto-create retractor (starts 5s before motor)"
+            onClick={(e) => {
+              e.stopPropagation();
+              autoCreateRetractor(component);
+            }}
+          >
+            <Plus size={16} />
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 interface ComponentTimelineProps {
-  // Define props if needed, e.g., components, setComponents
-  components: CycleComponent[]; // Replace with actual type
-  setComponents: (components: CycleComponent[]) => void; // Replace with actual type
-  isDragging: boolean; // To control the mask style
-  startTime?: number; // Optional start time for the timeline
-  setSelectedComponent: (component: CycleComponent | null) => void; // Function to set selected component
-  onDeleteComponent: (componentId: string) => void; // Function to delete component
+  components: CycleComponent[];
+  setComponents: (components: CycleComponent[]) => void;
+  isDragging: boolean;
+  startTime?: number;
+  setSelectedComponent: (component: CycleComponent | null) => void;
+  onDeleteComponent: (componentId: string) => void;
+  autoCreateRetractor?: (motorInfo: CycleComponent) => void;
 }
 
 function ComponentTimeline({
@@ -117,6 +143,7 @@ function ComponentTimeline({
   startTime,
   setSelectedComponent,
   onDeleteComponent,
+  autoCreateRetractor = () => {},
 }: ComponentTimelineProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: "droppable",
@@ -366,6 +393,7 @@ function ComponentTimeline({
                   startPercentage={componentData.startPercentage}
                   runningPercentage={componentData.runningPercentage}
                   onDeleteComponent={onDeleteComponent}
+                  autoCreateRetractor={autoCreateRetractor}
                 />
               ) : null;
             })}

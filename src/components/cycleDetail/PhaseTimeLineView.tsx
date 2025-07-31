@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import type { Phase } from "../../types/common/Phase";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -10,6 +11,8 @@ interface PhaseTimeLineViewProps {
 }
 
 function PhaseTimeLineView({ phase, phases_progress }: PhaseTimeLineViewProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { id } = phase;
   const progress_portion = phases_progress.find((p) => p.id === id);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -51,6 +54,10 @@ function PhaseTimeLineView({ phase, phases_progress }: PhaseTimeLineViewProps) {
 
   return (
     <div
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        navigate(`${location.pathname.replace(/\/$/, "")}/phase/${id}`);
+      }}
       ref={(node) => {
         setNodeRef(node);
         if (containerRef.current !== node) {
