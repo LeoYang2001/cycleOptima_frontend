@@ -53,8 +53,11 @@ function ComponentEditor({
         0
       );
       return patternDuration * repeatTimes;
+    } else if (motorRunningStyle === "Toggle Direction") {
+      // Toggle Direction has two steps per repeat cycle
+      return (stepTime + pauseTime) * 2 * repeatTimes;
     } else {
-      // Single Direction or Toggle Direction
+      // Single Direction
       return (stepTime + pauseTime) * repeatTimes;
     }
   };
@@ -197,6 +200,11 @@ function ComponentEditor({
                     pattern:
                       motorRunningStyle === "Custom Pattern"
                         ? customSteps
+                        : motorRunningStyle === "Toggle Direction"
+                        ? [
+                            { stepTime, pauseTime, direction },
+                            { stepTime, pauseTime, direction: direction === "cw" ? "ccw" : "cw" }
+                          ]
                         : [{ stepTime, pauseTime, direction }],
                     runningStyle: motorRunningStyle,
                   },
