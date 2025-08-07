@@ -1,5 +1,8 @@
-import React, { useState } from "react";
-import "./HaloVisualizer.css";
+// src/components/HaloVisualizer.tsx
+import React, { useEffect, useState } from "react";
+import "./HaloVisualizer.css"; // CSS for glow effect
+import eventBus from "../../voiceAgent/agent/tools/eventBus";
+import { useSessionContext } from "../../voiceAgent/session/sessionManager";
 
 type Props = {
   decibel: number | null;
@@ -10,26 +13,47 @@ type Props = {
 
 const HaloVisualizer: React.FC<Props> = ({
   decibel,
+  size = "medium",
   scaleRange = [0.8, 2.0],
-  size = "large", // default to large
 }) => {
+  const { session } = useSessionContext();
   const [haloState, setHaloState] = useState("");
+
   const [minScale, maxScale] = scaleRange;
 
-  // Compute dynamic scale
-  let scale = 1;
-  if (decibel !== null) {
-    const normalized = Math.min(Math.max(decibel / 50, 0), 1);
-    scale = minScale + (maxScale - minScale) * normalized;
-  }
-
   // Size mapping
-  const sizeMap = {
+  const sizeMap: Record<"small" | "medium" | "large", number> = {
     small: 40,
     medium: 80,
     large: 120,
   };
   const dimension = sizeMap[size];
+
+  useEffect(() => {
+    const handlePending = () => setHaloState("pending");
+    eventBus.on("agentPendingEnd", handlePending);
+    return () => {
+      eventBus.off("agentPendingEnd", handlePending);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!session) {
+      // maybe show a loading screen or "not connected" indicator
+      console.log(session, "Session is not ready");
+      setHaloState("");
+    } else {
+      // session is ready
+      console.log("Session is ready:", session);
+      setHaloState("active");
+    }
+  }, [session]);
+
+  let scale = 1;
+  if (decibel !== null) {
+    const normalized = Math.min(Math.max(decibel / 50, 0), 1);
+    scale = minScale + (maxScale - minScale) * normalized;
+  }
 
   return (
     <div className="halo-wrapper" style={{ height: dimension + 20 }}>
