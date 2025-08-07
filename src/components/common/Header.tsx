@@ -4,9 +4,15 @@ import { Color } from "../../constants";
 import { TextRevealCard } from "../ui/text-reveal-card";
 import HaloVisualizer from "../aiAssistant/HaloVisualizer";
 import { useDecibelDetector } from "../../hooks/useDecibelDetector";
+import VoiceWidget from "../../voiceAgent/voiceFeature/VoiceWidget";
+import {
+  startAgentSession,
+  useSessionContext,
+} from "../../voiceAgent/session/sessionManager";
 
 function Header() {
   const { decibelLevel, startDetection } = useDecibelDetector();
+  const { session, setSession } = useSessionContext();
   const location = useLocation();
   const navigate = useNavigate();
   const lastPathRef = useRef<string | null>(null);
@@ -89,10 +95,13 @@ function Header() {
               }
         }
       >
-        <HaloVisualizer
-          size={isHome ? "large" : "small"}
-          scaleRange={[0.8, 2]}
-          decibel={decibelLevel}
+        <VoiceWidget
+          onWakeWord={() => {
+            console.log("wake word detected");
+            if (!session) {
+              startAgentSession(setSession);
+            }
+          }}
         />
       </div>
     </div>
