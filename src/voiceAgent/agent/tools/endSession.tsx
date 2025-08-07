@@ -11,7 +11,6 @@ export const endSession = tool({
     sleepTime: z.number().min(3000).max(10000).default(6000),
   }),
   async execute({ sleepTime }) {
-    console.log("endSession executed");
     eventBus.emit("agentPendingEnd", true);
     externalEndSession?.(sleepTime);
     return `Goodbye for now, Leo! Ending the session in ${
