@@ -15,6 +15,7 @@ import CycleDetail from "./pages/cycleDetail/CycleDetail";
 import PhaseEditor from "./pages/phaseEditor/PhaseEditor";
 import "./utils/testSocket"; // Import test utility
 import { API_CONFIG, getNgrokHeaders } from "./config/api";
+import DeviceGuard from "./components/common/DeviceGuard";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -63,20 +64,22 @@ function App() {
   }, [dispatch]);
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Home />} />
-          <Route path="cycle-manager" element={<CycleManager />} />
-          <Route path="ai-assistant" element={<AiAssistant />} />
-          <Route path="system-monitor" element={<SystemMonitor />} />
-          <Route path="/cycle/:id" element={<CycleDetail />} />
-          <Route path="/cycle/:id/phase/:phaseId" element={<PhaseEditor />} />
-          {/* Catch-all route - redirect any unmatched routes to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <DeviceGuard>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Home />} />
+            <Route path="cycle-manager" element={<CycleManager />} />
+            <Route path="ai-assistant" element={<AiAssistant />} />
+            <Route path="system-monitor" element={<SystemMonitor />} />
+            <Route path="/cycle/:id" element={<CycleDetail />} />
+            <Route path="/cycle/:id/phase/:phaseId" element={<PhaseEditor />} />
+            {/* Catch-all route - redirect any unmatched routes to home */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </DeviceGuard>
   );
 }
 

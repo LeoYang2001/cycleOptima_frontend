@@ -48,6 +48,11 @@ function CycleDetail() {
   const [newPhaseName, setNewPhaseName] = useState("");
   const [newPhaseColor, setNewPhaseColor] = useState("4ADE80");
 
+  // Keypad modal state for run authorization
+  const [showKeypadModal, setShowKeypadModal] = useState(false);
+  const [enteredCode, setEnteredCode] = useState("");
+  const [codeError, setCodeError] = useState("");
+
   // Manual save trigger (for save button) - defined early so useEffect can reference it
   const handleSave = async () => {
     try {
@@ -66,14 +71,27 @@ function CycleDetail() {
     }
   };
 
-  // Manual run trigger (for run shortcut)
+  // Manual run trigger (for run shortcut) - now opens keypad modal first
   const handleRun = async () => {
+    if (!cycle) {
+      return; // No cycle to run
+    }
+
+    // Open keypad modal instead of running directly
+    setShowKeypadModal(true);
+    setEnteredCode("");
+    setCodeError("");
+  };
+
+  // Actual run function after code verification
+  const executeRun = async () => {
     try {
       if (!cycle) {
         return; // No cycle to run
       }
 
       setIsRunning(true);
+      setShowKeypadModal(false);
 
       const response = await fetch(
         "https://cycleoptima-production.up.railway.app/api/esp/run-flash",
@@ -99,6 +117,70 @@ function CycleDetail() {
       alert(`Failed to run cycle: ${(error as Error).message}`);
     }
   };
+
+  // Handle keypad input
+  const handleKeypadInput = (digit: string) => {
+    if (enteredCode.length < 4) {
+      setEnteredCode((prev) => prev + digit);
+    }
+  };
+
+  // Handle keypad backspace
+  const handleKeypadBackspace = () => {
+    setEnteredCode((prev) => prev.slice(0, -1));
+  };
+
+  // Handle keypad clear
+  const handleKeypadClear = () => {
+    setEnteredCode("");
+    setCodeError("");
+  };
+
+  // Handle code verification
+  const handleCodeSubmit = () => {
+    if (enteredCode === "0209") {
+      executeRun();
+    } else {
+      setCodeError("Invalid code. Please try again.");
+      setEnteredCode("");
+    }
+  };
+
+  // Close keypad modal
+  const handleCloseKeypadModal = () => {
+    setShowKeypadModal(false);
+    setEnteredCode("");
+    setCodeError("");
+  };
+
+  // Handle keyboard input for the keypad modal
+  useEffect(() => {
+    if (!showKeypadModal) return;
+
+    const handleKeypadKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+
+      if (e.key >= "0" && e.key <= "9") {
+        handleKeypadInput(e.key);
+      } else if (e.key === "Backspace") {
+        handleKeypadBackspace();
+      } else if (e.key === "Enter" && enteredCode.length === 4) {
+        handleCodeSubmit();
+      } else if (e.key === "Escape") {
+        handleCloseKeypadModal();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeypadKeyDown);
+    return () => document.removeEventListener("keydown", handleKeypadKeyDown);
+  }, [
+    showKeypadModal,
+    enteredCode,
+    handleKeypadInput,
+    handleKeypadBackspace,
+    handleCodeSubmit,
+    handleCloseKeypadModal,
+  ]);
 
   // Sync local state with Redux state when cycle changes
   useEffect(() => {
@@ -529,6 +611,92 @@ function CycleDetail() {
               >
                 Create Phase
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keypad Modal for Run Authorization */}
+      {showKeypadModal && (
+        <div
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          onClick={handleCloseKeypadModal}
+        >
+          {/* Modal Content */}
+          <div
+            style={{
+              backgroundColor: "#27272a",
+            }}
+            className="rounded-lg p-6 w-96 max-w-md py-10 mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="flex items-center gap-2">
+                <Play className="text-red-400" size={20} />
+                <h2 className="text-xl font-semibold text-white">
+                  Authorize Cycle Run
+                </h2>
+              </div>
+            </div>
+
+            {/* Security Message */}
+            <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
+              <p className="text-yellow-300 text-sm text-center">
+                🔒 Demo Security: Type the 4-digit authorization code to run
+                this cycle
+              </p>
+            </div>
+
+            {/* Code Display */}
+            <div className="mb-6">
+              <div className="flex justify-center gap-2 mb-4">
+                {[0, 1, 2, 3].map((index) => (
+                  <div
+                    key={index}
+                    className="w-12 h-12 border-2 border-gray-600 rounded-lg flex items-center justify-center text-white text-xl font-mono bg-gray-800"
+                  >
+                    {enteredCode[index] ? "●" : ""}
+                  </div>
+                ))}
+              </div>
+
+              {/* Error Message */}
+              {codeError && (
+                <p className="text-red-400 text-sm text-center mb-4">
+                  {codeError}
+                </p>
+              )}
+            </div>
+
+            {/* Keyboard Instructions */}
+            {/* <div className="mb-6 p-4 bg-blue-900/20 border border-blue-600/30 rounded-lg">
+              <p className="text-blue-300 text-sm text-center mb-2">
+                💻 Use your keyboard to enter the code:
+              </p>
+              <div className="flex justify-center gap-4 text-xs text-blue-200">
+                <span>• Type digits 0-9</span>
+                <span>• Backspace to delete</span>
+                <span>• Enter to submit</span>
+                <span>• Esc to cancel</span>
+              </div>
+            </div> */}
+
+            {/* Submit Button */}
+            <div className="flex justify-center">
+              <div
+                onClick={handleCodeSubmit}
+                className="px-8 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors cursor-pointer"
+              >
+                {enteredCode.length === 4
+                  ? "Run Cycle (Enter)"
+                  : `Enter ${4 - enteredCode.length} more digit${
+                      4 - enteredCode.length === 1 ? "" : "s"
+                    }`}
+              </div>
             </div>
           </div>
         </div>
