@@ -58,7 +58,6 @@ function VoiceWidget({ onWakeWord }: { onWakeWord: () => void }) {
 
   return (
     <div>
-      {error && <p style={{ color: "red" }}>Error: {error.toString()}</p>}
       <HaloVisualizer
         size={isHome ? "large" : "small"}
         scaleRange={[0.8, 2]}
