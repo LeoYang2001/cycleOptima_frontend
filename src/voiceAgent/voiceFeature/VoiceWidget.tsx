@@ -63,7 +63,7 @@ function VoiceWidget({ onWakeWord }: { onWakeWord: () => void }) {
   }, [keywordDetection]);
 
   return (
-    <div>
+    <div onDoubleClick={onWakeWord}>
       <HaloVisualizer
         size={isHome ? "large" : "small"}
         scaleRange={[0.8, 2]}

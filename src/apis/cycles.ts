@@ -8,7 +8,6 @@ export async function fetchAllWasherCycles() {
       headers: getNgrokHeaders(),
     }
   );
-  console.log(getApiUrl("/api/washer-cycles?sortBy=created_at&order=desc"));
   if (!res.ok) throw new Error("Failed to fetch washer cycles");
 
   const data = await res.json();

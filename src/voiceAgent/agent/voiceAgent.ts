@@ -1,5 +1,6 @@
 import { RealtimeAgent } from "@openai/agents-realtime";
 import { endSession } from "./tools/endSession";
+import { summarizeCycles } from "./tools/summarizeCycles";
 
 export const agent = new RealtimeAgent({
   name: "Assistant",
@@ -10,5 +11,5 @@ export const agent = new RealtimeAgent({
   Speak in a natural, conversational, and friendly tone.
   Speak in English.
   `,
-  tools: [endSession],
+  tools: [endSession, summarizeCycles],
 });
