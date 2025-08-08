@@ -3,8 +3,11 @@ import React, { use, useEffect, useState } from "react";
 import { usePorcupine } from "@picovoice/porcupine-react";
 import HaloVisualizer from "../../components/aiAssistant/HaloVisualizer";
 import { useDecibelDetector } from "../session/useDecibelDetector";
+import { WakeupWordModel } from "./wakeup_word";
+import { PorcupineModel } from "./porcupine_params";
 
-const accessKey = import.meta.env.VITE_PICOVOICE_ACCESS_KEY;
+// const accessKey = import.meta.env.VITE_PICOVOICE_ACCESS_KEY;
+const accessKey = "MNzYx3mPBk3Pf5kPgE0oDvBenL8STbpJRU5IUt2+rkky0UzUXbVbvQ=="; // Test
 
 function VoiceWidget({ onWakeWord }: { onWakeWord: () => void }) {
   const {
@@ -25,13 +28,17 @@ function VoiceWidget({ onWakeWord }: { onWakeWord: () => void }) {
     setIsHome(location.pathname === "/");
   }, [location.pathname]);
 
+  // const porcupineKeyword = {
+  //   publicPath: "/wakeup-word.ppn", // ✅ Must match your file in /public
+  //   label: "javis",
+  // };
+
   const porcupineKeyword = {
-    publicPath: "/wakeup-word.ppn", // ✅ Must match your file in /public
+    base64: WakeupWordModel, // Use the imported base64 string
     label: "javis",
   };
-
   const porcupineModel = {
-    publicPath: "/porcupine_params.pv",
+    base64: PorcupineModel,
   };
 
   useEffect(() => {
