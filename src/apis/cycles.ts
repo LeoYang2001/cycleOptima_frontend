@@ -12,6 +12,20 @@ export async function fetchAllWasherCycles() {
 
   const data = await res.json();
   console.log("all cycles:", data);
+
+  // Save to local storage, excluding embedding attribute
+  const dataWithoutEmbedding = Array.isArray(data) 
+    ? data.map(cycle => {
+        const { embedding, ...cycleWithoutEmbedding } = cycle;
+        return cycleWithoutEmbedding;
+      })
+    : (() => {
+        const { embedding, ...dataWithoutEmbedding } = data;
+        return dataWithoutEmbedding;
+      })();
+  
+  localStorage.setItem('washerCycles', JSON.stringify(dataWithoutEmbedding));
+  
   return data;
 }
 

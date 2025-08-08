@@ -11,18 +11,28 @@ export const summarizeCycles = tool({
    parameters: z.object({}),
   async execute() {
     try {
-        console.log("Fetching washer cycles for summary from API...", getApiUrl);
-        const res = await fetch(
-            getApiUrl("/api/washer-cycles?sortBy=created_at&order=desc"),
-            {
-              headers: getNgrokHeaders(),
-            }
-          );
-          if (!res.ok) throw new Error("Failed to fetch washer cycles");
+        console.log("Fetching washer cycles for summary from local storage...");
         
-          const data = await res.json();
-          console.log("all cycles:", data);
-          return JSON.stringify(data);
+        // Comment out API fetch for now
+        // const res = await fetch(
+        //     getApiUrl("/api/washer-cycles?sortBy=created_at&order=desc"),
+        //     {
+        //       headers: getNgrokHeaders(),
+        //     }
+        //   );
+        //   if (!res.ok) throw new Error("Failed to fetch washer cycles");
+        // 
+        //   const data = await res.json();
+        
+        // Fetch from local storage instead
+        const storedData = localStorage.getItem('washerCycles');
+        if (!storedData) {
+            throw new Error("No washer cycles found in local storage");
+        }
+        
+        const data = JSON.parse(storedData);
+        console.log("all cycles from localStorage:", data);
+        return JSON.stringify(data);
     } catch (error) {
         console.error("Error fetching washer cycles:", error);
         throw error;
