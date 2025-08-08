@@ -6,8 +6,7 @@ import { useDecibelDetector } from "../session/useDecibelDetector";
 import { WakeupWordModel } from "./wakeup_word";
 import { PorcupineModel } from "./porcupine_params";
 
-// const accessKey = import.meta.env.VITE_PICOVOICE_ACCESS_KEY;
-const accessKey = "MNzYx3mPBk3Pf5kPgE0oDvBenL8STbpJRU5IUt2+rkky0UzUXbVbvQ=="; // Test
+const accessKey = import.meta.env.VITE_PICOVOICE_ACCESS_KEY;
 
 function VoiceWidget({ onWakeWord }: { onWakeWord: () => void }) {
   const {
