@@ -28,7 +28,7 @@ export function getStyle(compId: string, iconSize = 18) {
         color: "#ef4848",
         icon: <Wind size={iconSize} color="#fff" />,
       };
-    case "Drain Valve":
+    case "Detergent Valve":
       return {
         color: "#8b5cf6",
         icon: <CloudRain size={iconSize} color="#fff" />,
