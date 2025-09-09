@@ -23,7 +23,9 @@ import {
   selectLibraryLoading,
 } from "../../store/librarySlice";
 import ComponentEditor from "../../components/phaseEditor/ComponentEditor";
+import SensorTriggerModal from "../../components/phaseEditor/SensorTriggerModal";
 import type { CycleComponent } from "../../types/common/CycleComponent";
+import type { SensorTrigger } from "../../types/common/Phase";
 
 function PhaseEditor() {
   const dispatch = useDispatch<AppDispatch>();
@@ -109,6 +111,9 @@ function PhaseEditor() {
   const [phaseName, setPhaseName] = useState(phase?.name || "");
   const [startTime, setStartTime] = useState(phase?.startTime || 0);
   const [components, setComponents] = useState(phase?.components || []);
+  const [sensorTrigger, setSensorTrigger] = useState<SensorTrigger | null>(
+    phase?.sensorTrigger || null
+  );
 
   const [isDragging, setIsDragging] = useState(false);
   const [initialDragPosition, setInitialDragPosition] = useState<{
@@ -116,6 +121,7 @@ function PhaseEditor() {
     distanceToRightBorder: number;
   } | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showSensorModal, setShowSensorModal] = useState(false);
 
   const [selectedComponent, setSelectedComponent] =
     useState<CycleComponent | null>(null);
@@ -191,9 +197,10 @@ function PhaseEditor() {
   const hasChanges =
     phaseName !== (phase?.name || "") ||
     startTime !== (phase?.startTime || 0) ||
-    JSON.stringify(components) !== JSON.stringify(phase?.components || []);
+    JSON.stringify(components) !== JSON.stringify(phase?.components || []) ||
+    JSON.stringify(sensorTrigger) !== JSON.stringify(phase?.sensorTrigger || null);
 
-  // Handle save changes
+  // Handle save changes - now shows sensor trigger modal first
   const handleSaveChanges = () => {
     if (!cycle || !phase || !hasChanges || selectedComponent) return;
 
@@ -203,6 +210,14 @@ function PhaseEditor() {
       return;
     }
 
+    // Show sensor trigger modal before final save
+    setShowSensorModal(true);
+  };
+
+  // Handle final save after sensor trigger configuration
+  const handleFinalSave = (finalSensorTrigger: SensorTrigger | null) => {
+    if (!cycle || !phase) return;
+
     // Update the phase in the cycle
     const updatedPhases = cycle.data.phases.map((p) =>
       p.id === phaseId
@@ -211,6 +226,7 @@ function PhaseEditor() {
             name: phaseName,
             startTime: startTime,
             components: components,
+            sensorTrigger: finalSensorTrigger === null ? undefined : finalSensorTrigger,
           }
         : p
     );
@@ -328,6 +344,7 @@ function PhaseEditor() {
     };
     setComponents((prev: any[]) => [...prev, retractorComponent]);
   };
+
   return (
     <div
       className="w-full h-full flex flex-col relative overflow-hidden"
@@ -416,7 +433,7 @@ function PhaseEditor() {
         </section>
       </DndContext>
 
-      {/* Modal */}
+      {/* Component Editor Modal */}
       <Modal isOpen={showModal} onClose={handleRemoveModal}>
         <ComponentEditor
           setComponents={setComponents}
@@ -424,6 +441,14 @@ function PhaseEditor() {
           onClose={handleRemoveModal}
         />
       </Modal>
+
+      {/* Sensor Trigger Modal */}
+      <SensorTriggerModal
+        isOpen={showSensorModal}
+        onClose={() => setShowSensorModal(false)}
+        onSave={handleFinalSave}
+        currentTrigger={sensorTrigger}
+      />
     </div>
   );
 }
