@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import SensorDataPresentation from "../../components/monitor/sensorDataPresentation";
 
 const ESP32_URL = "http://192.168.4.193:8080";
 const WEBSOCKET_URL = "ws://192.168.4.193:8080/ws";
@@ -97,6 +98,8 @@ function SystemMonitor() {
   const [lastTelemetryUpdate, setLastTelemetryUpdate] = useState<number>(0);
   const websocketRef = useRef<WebSocket | null>(null);
   const telemetryIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Add state for sensor data modal
+  const [showSensorModal, setShowSensorModal] = useState(false);
 
   // Calculate total cycle duration from phase data
   const calculateTotalDuration = (phases: Phase[]): number => {
@@ -551,20 +554,50 @@ function SystemMonitor() {
           </div>
         </div>
 
-        {/* Live Sensor Data Card */}
-        <div style={{
-          background: "#1a1a1a",
-          border: "1px solid #333",
-          borderRadius: "12px",
-          padding: "24px"
-        }}>
-          <h3 style={{ 
-            margin: "0 0 20px 0", 
-            fontSize: "18px", 
-            fontWeight: "600" 
+        {/* Live Sensor Data Card - Make it clickable */}
+        <div 
+          style={{
+            background: "#1a1a1a",
+            border: "1px solid #333",
+            borderRadius: "12px",
+            padding: "24px",
+            cursor: "pointer",
+            transition: "all 0.2s ease"
+          }}
+          onClick={() => setShowSensorModal(true)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#252525";
+            e.currentTarget.style.borderColor = "#444";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#1a1a1a";
+            e.currentTarget.style.borderColor = "#333";
+          }}
+        >
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px"
           }}>
-            Live Sensor Data
-          </h3>
+            <h3 style={{ 
+              margin: "0", 
+              fontSize: "18px", 
+              fontWeight: "600" 
+            }}>
+              Live Sensor Data
+            </h3>
+            <div style={{
+              padding: "4px 8px",
+              background: "#3b82f6",
+              borderRadius: "12px",
+              fontSize: "10px",
+              fontWeight: "600",
+              textTransform: "uppercase"
+            }}>
+              Click for Analytics
+            </div>
+          </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <div style={{ 
@@ -982,6 +1015,13 @@ function SystemMonitor() {
           ))}
         </div>
       </div>
+
+      {/* Sensor Data Modal */}
+      <SensorDataPresentation
+        isOpen={showSensorModal}
+        onClose={() => setShowSensorModal(false)}
+        telemetryData={telemetryData}
+      />
     </div>
   );
 }
