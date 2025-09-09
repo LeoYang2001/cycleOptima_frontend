@@ -125,7 +125,7 @@ function CycleTimeLinePreview({
           }}
           className=" w-full relative flex flex-col mb-2 rounded-lg "
         >
-          <div className=" px-10 w-full  top-2 z-30 absolute flex justify-start items-center  text-black">
+          <div className=" px-10 w-full  top-2 z-10 absolute flex justify-start items-center  text-black">
             {" "}
             <TicksLineComponents ticks={ticks} />
           </div>
