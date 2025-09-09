@@ -43,10 +43,10 @@ function App() {
     });
 
     // Listen for cycle events
-    socket.on("cycle_updated", () => {
-      console.log("🔄 Received cycle_updated event, refetching cycles...");
-      dispatch(fetchCycles()); // Refetch when notified
-    });
+    // socket.on("cycle_updated", () => {
+    //   console.log("🔄 Received cycle_updated event, refetching cycles...");
+    //   dispatch(fetchCycles()); // Refetch when notified
+    // });
 
     socket.on("cycle_created", () => {
       console.log("🆕 Received cycle_created event, refetching cycles...");

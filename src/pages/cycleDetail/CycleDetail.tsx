@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
 import { useParams, useNavigate } from "react-router-dom";
-import { Logs, Play, X, Palette } from "lucide-react";
+import { Logs, Play, X, Palette, Monitor } from "lucide-react";
 import Note from "../../components/cycleDetail/Note";
 import Section from "../../components/common/Section";
 import CycleTimeLinePreview from "../../components/common/CycleTimeLinePreview";
@@ -42,6 +42,7 @@ function CycleDetail() {
   );
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [flashCompleted, setFlashCompleted] = useState(false);
 
   // Phase creation modal state
   const [showPhaseModal, setShowPhaseModal] = useState(false);
@@ -83,6 +84,19 @@ function CycleDetail() {
     setCodeError("");
   };
 
+  // Navigate to monitor with cycle data
+  const handleMonitor = () => {
+    if (!cycle) return;
+
+    // Navigate to monitor page with cycle data as state
+    navigate("/system-monitor", {
+      state: {
+        cycleData: cycle,
+        timestamp: Date.now(),
+      },
+    });
+  };
+
   // Actual run function after code verification
   const executeRun = async () => {
     try {
@@ -91,6 +105,7 @@ function CycleDetail() {
       }
 
       setIsRunning(true);
+      setFlashCompleted(false);
       setShowKeypadModal(false);
 
       const response = await fetch(
@@ -111,9 +126,16 @@ function CycleDetail() {
       }
 
       setIsRunning(false);
+      setFlashCompleted(true);
+
+      // Auto-hide the flash completed state after 10 seconds
+      setTimeout(() => {
+        setFlashCompleted(false);
+      }, 10000);
     } catch (error) {
       console.error("Run failed:", error);
       setIsRunning(false); // Reset loading state on error
+      setFlashCompleted(false);
       alert(`Failed to run cycle: ${(error as Error).message}`);
     }
   };
@@ -201,15 +223,21 @@ function CycleDetail() {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "r") {
         e.preventDefault();
-        if (!isRunning) {
+        if (!isRunning && !flashCompleted) {
           handleRun();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "m") {
+        e.preventDefault();
+        if (flashCompleted) {
+          handleMonitor();
         }
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [pendingCount, handleSave, isRunning, handleRun]);
+  }, [pendingCount, handleSave, isRunning, flashCompleted, handleRun, handleMonitor]);
 
   // Reset saving state when all changes are saved
   useEffect(() => {
@@ -369,15 +397,28 @@ function CycleDetail() {
             }}
           />
           <div className="flex items-center gap-4">
-            {/* Run Status Indicator */}
+            {/* Run/Monitor Status Indicator */}
             {isRunning ? (
               <div className="flex items-center gap-3 bg-purple-900/20 border border-purple-600/30 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <Play className="w-3 h-3 text-purple-400 animate-pulse" />
                   <span className="text-purple-300 text-sm font-medium">
-                    Running cycle...
+                    Flashing cycle...
                   </span>
                 </div>
+              </div>
+            ) : flashCompleted ? (
+              <div
+                className="flex items-center gap-3 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2 hover:bg-green-800/30 transition-colors cursor-pointer"
+                onClick={handleMonitor}
+              >
+                <div className="flex items-center gap-2">
+                  <Monitor className="w-3 h-3 text-green-400" />
+                  <span className="text-green-300 text-sm font-medium">
+                    Flash completed - Monitor cycle
+                  </span>
+                </div>
+                <span className="text-green-400 text-xs opacity-70">Ctrl+M</span>
               </div>
             ) : (
               <div
@@ -435,7 +476,7 @@ function CycleDetail() {
       </header>
       <section className="flex-1 flex flex-row gap-10 pb-10 w-full overflow-hidden">
         <div className="flex flex-col gap-10 w-[70%] h-full overflow-hidden">
-          <div className="overflow-hidden">
+          <div className="overflow-hidden relative">
             <Section
               icon={Play}
               title="Phases Timeline"
@@ -449,8 +490,20 @@ function CycleDetail() {
                 func={addPhase}
               />
             </Section>
+            {/* Mask overlay for CycleTimeLinePreview when running */}
+            {isRunning && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                <div className="bg-purple-900/20 border border-purple-600/30 rounded-lg px-6 py-4 flex items-center gap-3">
+                  <Play className="w-5 h-5 text-purple-400 animate-pulse" />
+                  <div className="text-center">
+                    <div className="text-purple-300 font-medium">Cycle is flashing...</div>
+                    <div className="text-purple-400 text-sm opacity-80">Navigation disabled during flash operation</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="flex-1 overflow-y-auto custom-scrollbar relative">
             <Section icon={Logs} title="Phase Breakdown">
               <PhaseBreakdown
                 deletePhase={deletePhase}
@@ -458,6 +511,18 @@ function CycleDetail() {
                 Phases={cycle.data.phases}
               />
             </Section>
+            {/* Mask overlay for PhaseBreakdown when running */}
+            {isRunning && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                <div className="bg-purple-900/20 border border-purple-600/30 rounded-lg px-6 py-4 flex items-center gap-3">
+                  <Play className="w-5 h-5 text-purple-400 animate-pulse" />
+                  <div className="text-center">
+                    <div className="text-purple-300 font-medium">Cycle is flashing...</div>
+                    <div className="text-purple-400 text-sm opacity-80">Phase editing disabled during flash operation</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         <div
@@ -671,19 +736,6 @@ function CycleDetail() {
                 </p>
               )}
             </div>
-
-            {/* Keyboard Instructions */}
-            {/* <div className="mb-6 p-4 bg-blue-900/20 border border-blue-600/30 rounded-lg">
-              <p className="text-blue-300 text-sm text-center mb-2">
-                💻 Use your keyboard to enter the code:
-              </p>
-              <div className="flex justify-center gap-4 text-xs text-blue-200">
-                <span>• Type digits 0-9</span>
-                <span>• Backspace to delete</span>
-                <span>• Enter to submit</span>
-                <span>• Esc to cancel</span>
-              </div>
-            </div> */}
 
             {/* Submit Button */}
             <div className="flex justify-center">

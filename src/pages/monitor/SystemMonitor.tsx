@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 
 const ESP32_URL = "http://192.168.4.193:8080";
 const WEBSOCKET_URL = "ws://192.168.4.193:8080/ws";
@@ -40,7 +41,47 @@ interface TelemetryData {
   timestamp: number;
 }
 
+interface Phase {
+  id: string;
+  name: string;
+  color: string;
+  startTime: number;
+  components: Array<{
+    id: string;
+    label: string;
+    start: number;
+    compId: string;
+    duration: number;
+    motorConfig: any;
+  }>;
+  sensorTrigger?: {
+    type: string;
+    pinNumber: number;
+    threshold: number;
+  };
+}
+
+interface CycleData {
+  id: string;
+  displayName: string;
+  data: {
+    name: string;
+    phases: Phase[];
+  };
+  created_at: string;
+  updated_at: string;
+  engineer_note: string;
+  status: string;
+  tested_at: string;
+}
+
 function SystemMonitor() {
+  const location = useLocation();
+  
+  // Get cycle data from navigation state
+  const cycleData: CycleData | null = location.state?.cycleData || null;
+  const timestamp = location.state?.timestamp || null;
+
   const [pinStates, setPinStates] = useState<Record<number, boolean>>({});
   const [cycleStatus, setCycleStatus] = useState<CycleStatus>({
     running: false,
@@ -56,6 +97,45 @@ function SystemMonitor() {
   const [lastTelemetryUpdate, setLastTelemetryUpdate] = useState<number>(0);
   const websocketRef = useRef<WebSocket | null>(null);
   const telemetryIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Calculate total cycle duration from phase data
+  const calculateTotalDuration = (phases: Phase[]): number => {
+    return phases.reduce((total, phase) => {
+      const phaseDuration = phase.components.reduce((phaseTotal, component) => {
+        return Math.max(phaseTotal, component.start + component.duration);
+      }, 0);
+      return total + phaseDuration;
+    }, 0);
+  };
+
+  // Get phase durations for timeline rendering
+  const getPhaseTimeline = () => {
+    if (!cycleData?.data.phases) return [];
+    
+    return cycleData.data.phases.map((phase, index) => {
+      const phaseDuration = phase.components.reduce((max, component) => {
+        return Math.max(max, component.start + component.duration);
+      }, 0);
+      
+      return {
+        name: phase.name,
+        color: `#${phase.color}`,
+        duration: phaseDuration,
+        index: index + 1
+      };
+    });
+  };
+
+  // Auto-start telemetry when cycle data is available
+  useEffect(() => {
+    if (cycleData && wsConnected && !telemetryEnabled) {
+      console.log("Auto-starting telemetry for loaded cycle:", cycleData.displayName);
+      setTelemetryEnabled(true);
+      if (websocketRef.current) {
+        websocketRef.current.send("start_telemetry");
+      }
+    }
+  }, [cycleData, wsConnected, telemetryEnabled]);
 
   // WebSocket connection setup
   useEffect(() => {
@@ -214,379 +294,690 @@ function SystemMonitor() {
     return `${diff}s ago`;
   };
 
+  const calculateProgress = () => {
+    if (!telemetryData) return 0;
+    return (telemetryData.current_phase / telemetryData.total_phases) * 100;
+  };
+
+  // Display cycle information if available
+  useEffect(() => {
+    if (cycleData && timestamp) {
+      console.log("Received cycle data for monitoring:", cycleData);
+      console.log("Flash completed at:", new Date(timestamp));
+    }
+  }, [cycleData, timestamp]);
+
+  const phaseTimeline = getPhaseTimeline();
+
   return (
-    <div style={{ padding: "20px" }}>
-      {/* Enhanced Connection Status */}
-      <div style={{ marginBottom: "20px", textAlign: "center" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: "12px",
-            flexWrap: "wrap",
-          }}
-        >
-          <span
-            style={{
-              padding: "4px 8px",
+    <div style={{ 
+      minHeight: "100vh", 
+      color: "#fff", 
+      fontFamily: "Inter, system-ui, sans-serif"
+    }}>
+      {/* Header */}
+      <div style={{ 
+        display: "flex", 
+        justifyContent: "space-between", 
+        alignItems: "center", 
+        marginBottom: "24px" 
+      }}>
+        <div>
+          <h1 style={{ 
+            fontSize: "28px", 
+            fontWeight: "700", 
+            margin: "0 0 4px 0",
+            color: "#fff"
+          }}>
+            {cycleData ? `${cycleData.displayName} - Monitor` : "Cycle Monitor"}
+          </h1>
+          <p style={{ 
+            color: "#64748b", 
+            margin: "0",
+            fontSize: "14px"
+          }}>
+            {cycleData 
+              ? `Monitoring cycle flashed at ${new Date(timestamp).toLocaleTimeString()} • ${phaseTimeline.length} phases`
+              : "Real-time monitoring and control of active washer cycle"
+            }
+          </p>
+        </div>
+        {/* Show cycle info badge if we have cycle data */}
+        {cycleData && (
+          <div style={{
+            padding: "8px 16px",
+            background: "#059669",
+            borderRadius: "20px",
+            fontSize: "12px",
+            fontWeight: "600",
+            textTransform: "uppercase"
+          }}>
+            CYCLE LOADED
+          </div>
+        )}
+      </div>
+
+      {/* Main Grid */}
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: "2fr 1fr", 
+        gap: "24px",
+        marginBottom: "24px"
+      }}>
+        {/* Cycle Progress Card */}
+        <div style={{
+          background: "#1a1a1a",
+          border: "1px solid #333",
+          borderRadius: "12px",
+          padding: "24px"
+        }}>
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "8px",
+            marginBottom: "20px"
+          }}>
+            <div style={{ 
+              width: "8px", 
+              height: "8px", 
+              background: "#22c55e", 
+              borderRadius: "50%" 
+            }}></div>
+            <h3 style={{ margin: "0", fontSize: "18px", fontWeight: "600" }}>
+              Cycle Progress
+            </h3>
+          </div>
+
+          {/* Overall Progress */}
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              marginBottom: "8px" 
+            }}>
+              <span style={{ fontSize: "14px", color: "#94a3b8" }}>Overall Progress</span>
+              <span style={{ fontSize: "14px", fontWeight: "600" }}>
+                {calculateProgress().toFixed(1)}%
+              </span>
+            </div>
+            <div style={{
+              background: "#333",
               borderRadius: "4px",
-              background: wsConnected ? "#22c55e" : "#ef4444",
-              color: "#fff",
-              fontSize: "12px",
-            }}
-          >
-            Client WS: {wsConnected ? "Connected" : "Disconnected"}
-          </span>
-          <span
-            style={{
-              padding: "4px 8px",
+              height: "8px",
+              overflow: "hidden"
+            }}>
+              <div style={{
+                background: "#22c55e",
+                height: "100%",
+                width: `${calculateProgress()}%`,
+                transition: "width 0.3s ease"
+              }}></div>
+            </div>
+          </div>
+
+          {/* Current Phase */}
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              marginBottom: "8px" 
+            }}>
+              <span style={{ fontSize: "14px", color: "#94a3b8" }}>
+                Current Phase: {telemetryData?.current_phase_name || "Unknown"}
+              </span>
+              <span style={{ fontSize: "14px", fontWeight: "600" }}>
+                Phase {telemetryData?.current_phase || 1} of {telemetryData?.total_phases || phaseTimeline.length}
+              </span>
+            </div>
+            <div style={{
+              background: "#333",
               borderRadius: "4px",
-              background: cycleStatus.wifi_connected ? "#22c55e" : "#ef4444",
-              color: "#fff",
-              fontSize: "12px",
-            }}
-          >
-            ESP32 WiFi:{" "}
-            {cycleStatus.wifi_connected ? "Connected" : "Disconnected"}
-          </span>
-          <span
-            style={{
-              padding: "4px 8px",
-              borderRadius: "4px",
-              background: cycleStatus.websocket_connected ? "#22c55e" : "#ef4444",
-              color: "#fff",
-              fontSize: "12px",
-            }}
-          >
-            ESP32 WS:{" "}
-            {cycleStatus.websocket_connected ? "Connected" : "Disconnected"}
-          </span>
-          <span
-            style={{
-              padding: "4px 8px",
-              borderRadius: "4px",
-              background: "#3b82f6",
-              color: "#fff",
-              fontSize: "12px",
-            }}
-          >
-            WS Connections: {cycleStatus.ws_connections || 0}
-          </span>
-          <span
-            style={{
-              padding: "4px 8px",
-              borderRadius: "4px",
-              background: telemetryEnabled ? "#22c55e" : "#6b7280",
-              color: "#fff",
-              fontSize: "12px",
-            }}
-          >
-            Telemetry: {telemetryEnabled ? "Auto-Updating" : "Inactive"}
-          </span>
-          {telemetryIntervalRef.current && (
-            <span
+              height: "8px",
+              overflow: "hidden"
+            }}>
+              <div style={{
+                background: "#22c55e",
+                height: "100%",
+                width: "75%"
+              }}></div>
+            </div>
+          </div>
+
+          {/* Phase Timeline - Dynamic based on cycle data */}
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ fontSize: "14px", color: "#94a3b8", marginBottom: "12px" }}>
+              Phase Timeline {cycleData && `(${cycleData.data.name})`}
+            </div>
+            <div style={{ display: "flex", height: "40px", borderRadius: "6px",  }}>
+              {phaseTimeline.length > 0 ? (
+                phaseTimeline.map((phase, index) => (
+                  <div 
+                    key={phase.name}
+                    style={{ 
+                      background: phase.color, 
+                      flex: "1", 
+                      display: "flex", 
+                      alignItems: "center", 
+                      justifyContent: "center",
+                      fontSize: "12px",
+                      fontWeight: "600",
+                      position: "relative",
+                      opacity: telemetryData?.current_phase === phase.index ? 1 : 0.7,
+                      border: telemetryData?.current_phase === phase.index ? "2px solid #fff" : "none"
+                    }}
+                  >
+                    {phase.name}
+                    {telemetryData?.current_phase === phase.index && (
+                      <div style={{
+                        position: "absolute",
+                        top: "-8px",
+                        right: "-8px",
+                        width: "16px",
+                        height: "16px",
+                        background: "#22c55e",
+                        borderRadius: "50%",
+                        border: "2px solid #fff",
+                        animation: "pulse 2s infinite"
+                      }}></div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                // Default phases when no cycle data
+                <>
+                  <div style={{ 
+                    background: "#1e40af", 
+                    flex: "1", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    fontSize: "12px",
+                    fontWeight: "600"
+                  }}>
+                    Pre-wash
+                  </div>
+                  <div style={{ 
+                    background: "#059669", 
+                    flex: "1", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    fontSize: "12px",
+                    fontWeight: "600"
+                  }}>
+                    Main wash
+                  </div>
+                  <div style={{ 
+                    background: "#d97706", 
+                    flex: "1", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    fontSize: "12px",
+                    fontWeight: "600"
+                  }}>
+                    Rinse
+                  </div>
+                  <div style={{ 
+                    background: "#dc2626", 
+                    flex: "1", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    fontSize: "12px",
+                    fontWeight: "600"
+                  }}>
+                    Final spin
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Time Display */}
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "32px", fontWeight: "700", color: "#fff" }}>
+                {telemetryData ? formatElapsedTime(telemetryData.elapsed_seconds) : "00:00:00"}
+              </div>
+              <div style={{ fontSize: "12px", color: "#64748b" }}>Elapsed Time</div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "32px", fontWeight: "700", color: "#fff" }}>
+                {cycleData ? `${phaseTimeline.length}` : "4"}
+              </div>
+              <div style={{ fontSize: "12px", color: "#64748b" }}>Total Phases</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Sensor Data Card */}
+        <div style={{
+          background: "#1a1a1a",
+          border: "1px solid #333",
+          borderRadius: "12px",
+          padding: "24px"
+        }}>
+          <h3 style={{ 
+            margin: "0 0 20px 0", 
+            fontSize: "18px", 
+            fontWeight: "600" 
+          }}>
+            Live Sensor Data
+          </h3>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center" 
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ 
+                  width: "32px", 
+                  height: "32px", 
+                  borderRadius: "6px", 
+                  background: "#3b82f6",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "14px",
+                  fontWeight: "600"
+                }}>
+                  P
+                </div>
+                <span style={{ fontSize: "14px" }}>Pressure</span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "20px", fontWeight: "700" }}>2.2</div>
+                <div style={{ fontSize: "12px", color: "#64748b" }}>bar</div>
+              </div>
+            </div>
+
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center" 
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ 
+                  width: "32px", 
+                  height: "32px", 
+                  borderRadius: "6px", 
+                  background: "#10b981",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "14px",
+                  fontWeight: "600"
+                }}>
+                  R
+                </div>
+                <span style={{ fontSize: "14px" }}>Flow Rate</span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "20px", fontWeight: "700" }}>
+                  {telemetryData?.sensors.flow_sensor_pin3.toFixed(1) || "0.0"}
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748b" }}>pulses/sec</div>
+              </div>
+            </div>
+
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center" 
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ 
+                  width: "32px", 
+                  height: "32px", 
+                  borderRadius: "6px", 
+                  background: "#ef4444",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "14px",
+                  fontWeight: "600"
+                }}>
+                  T
+                </div>
+                <span style={{ fontSize: "14px" }}>Temperature</span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "20px", fontWeight: "700" }}>39.7</div>
+                <div style={{ fontSize: "12px", color: "#64748b" }}>°C</div>
+              </div>
+            </div>
+
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center" 
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ 
+                  width: "32px", 
+                  height: "32px", 
+                  borderRadius: "6px", 
+                  background: "#06b6d4",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "14px",
+                  fontWeight: "600"
+                }}>
+                  W
+                </div>
+                <span style={{ fontSize: "14px" }}>Water Level</span>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "20px", fontWeight: "700" }}>74.5</div>
+                <div style={{ fontSize: "12px", color: "#64748b" }}>%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Second Row */}
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: "1fr 1fr", 
+        gap: "24px",
+        marginBottom: "24px"
+      }}>
+        {/* Quick Actions Card */}
+        <div style={{
+          background: "#1a1a1a",
+          border: "1px solid #333",
+          borderRadius: "12px",
+          padding: "24px"
+        }}>
+          <h3 style={{ 
+            margin: "0 0 20px 0", 
+            fontSize: "18px", 
+            fontWeight: "600" 
+          }}>
+            Quick Actions
+          </h3>
+
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <button
               style={{
-                padding: "4px 8px",
-                borderRadius: "4px",
+                padding: "12px 20px",
+                background: "#22c55e",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+              onClick={() => sendWebSocketCommand("start")}
+            >
+              ▶ Start Cycle
+            </button>
+            <button
+              style={{
+                padding: "12px 20px",
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+              onClick={() => sendWebSocketCommand("stop")}
+            >
+              ⏹ Stop Cycle
+            </button>
+            <button
+              style={{
+                padding: "12px 20px",
+                background: "#3b82f6",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+              onClick={() => sendWebSocketCommand("prev")}
+            >
+              ⏮ Previous Phase
+            </button>
+              <button
+              style={{
+                padding: "12px 20px",
+                background: "#6b7280",
+                color: "#fff",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+              onClick={() => sendWebSocketCommand("skip")}
+            >
+              ⏭ Skip Phase
+            </button>
+            <button
+              style={{
+                padding: "12px 20px",
                 background: "#f59e0b",
                 color: "#fff",
-                fontSize: "12px",
+                border: "none",
+                borderRadius: "8px",
+                fontWeight: "600",
+                fontSize: "14px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
               }}
+              onClick={() => sendWebSocketCommand("restart")}
             >
-              Polling: 1s interval
-            </span>
-          )}
+              🔄 Restart Phase
+            </button>
+            
+          
+          </div>
         </div>
-      </div>
 
-      {/* Telemetry Control */}
-      <div style={{ marginBottom: "20px" }}>
-        <h3 style={{ textAlign: "center", marginBottom: "16px" }}>
-          Telemetry Control
-        </h3>
-        <div style={{ display: "flex", justifyContent: "center", gap: "12px" }}>
-          <button
-            style={{
-              padding: "12px 20px",
-              background: telemetryEnabled ? "#ef4444" : "#22c55e",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "120px",
-            }}
-            onClick={toggleTelemetry}
-          >
-            {telemetryEnabled ? "Stop Auto-Update" : "Start Auto-Update"}
-          </button>
-          <button
-            style={{
-              padding: "12px 20px",
-              background: "#3b82f6",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "120px",
-            }}
-            onClick={getTelemetrySnapshot}
-          >
-            Get Snapshot
-          </button>
-          <button
-            style={{
-              padding: "12px 20px",
-              background: "#f59e0b",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "80px",
-            }}
-            onClick={sendPing}
-          >
-            Ping
-          </button>
-        </div>
-      </div>
+        {/* System Status Card */}
+        <div style={{
+          background: "#1a1a1a",
+          border: "1px solid #333",
+          borderRadius: "12px",
+          padding: "24px"
+        }}>
+          <h3 style={{ 
+            margin: "0 0 20px 0", 
+            fontSize: "18px", 
+            fontWeight: "600" 
+          }}>
+            System Status
+          </h3>
 
-      {/* Telemetry Data Window */}
-      <div style={{ marginBottom: "30px" }}>
-        <h3 style={{ textAlign: "center", marginBottom: "16px" }}>
-          Live Telemetry Data
-          <span style={{ fontSize: "12px", color: "#666", marginLeft: "10px" }}>
-            Last update: {getTimeSinceLastUpdate()}
-          </span>
-        </h3>
-        <div
-          style={{
-            background: "#1a1a1a",
-            border: "1px solid #333",
-            borderRadius: "8px",
-            padding: "16px",
-            maxHeight: "400px",
-            overflow: "auto",
-          }}
-        >
-          {telemetryData ? (
-            <div style={{ color: "#fff", fontFamily: "monospace", fontSize: "12px" }}>
-              {/* Cycle Information */}
-              <div style={{ marginBottom: "16px", padding: "12px", background: "#2a2a2a", borderRadius: "6px" }}>
-                <h4 style={{ margin: "0 0 8px 0", color: "#22c55e" }}>Cycle Status</h4>
-                <div>Running: <span style={{ color: telemetryData.cycle_running ? "#22c55e" : "#ef4444" }}>
-                  {telemetryData.cycle_running ? "YES" : "NO"}
-                </span></div>
-                <div>Phase: {telemetryData.current_phase}/{telemetryData.total_phases} - {telemetryData.current_phase_name}</div>
-                <div>Elapsed: {formatElapsedTime(telemetryData.elapsed_seconds)}</div>
-              </div>
-
-              {/* Sensor Data */}
-              <div style={{ marginBottom: "16px", padding: "12px", background: "#2a2a2a", borderRadius: "6px" }}>
-                <h4 style={{ margin: "0 0 8px 0", color: "#3b82f6" }}>Sensors</h4>
-                <div>Flow Sensor (Pin 3): {telemetryData.sensors.flow_sensor_pin3.toFixed(1)} pulses/sec</div>
-              </div>
-
-              {/* Component Status */}
-              <div style={{ marginBottom: "16px", padding: "12px", background: "#2a2a2a", borderRadius: "6px" }}>
-                <h4 style={{ margin: "0 0 8px 0", color: "#f59e0b" }}>Components</h4>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
-                  {telemetryData.components.map((component, index) => (
-                    <div key={index} style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>{component.name} (Pin {component.pin}):</span>
-                      <span style={{ color: component.active ? "#22c55e" : "#ef4444" }}>
-                        {component.active ? "ON" : "OFF"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Timestamp */}
-              <div style={{ fontSize: "10px", color: "#666", textAlign: "right" }}>
-                Timestamp: {new Date(telemetryData.timestamp).toLocaleString()}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center" 
+            }}>
+              <span style={{ fontSize: "14px", color: "#94a3b8" }}>ESP Connection</span>
+              <div style={{
+                padding: "4px 8px",
+                background: wsConnected ? "#059669" : "#dc2626",
+                borderRadius: "12px",
+                fontSize: "12px",
+                fontWeight: "600"
+              }}>
+                {wsConnected ? "Connected" : "Disconnected"}
               </div>
             </div>
-          ) : (
-            <div style={{ color: "#666", textAlign: "center", padding: "40px" }}>
-              No telemetry data received yet. Click "Start Auto-Update" or "Get Snapshot" to begin.
+
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center" 
+            }}>
+              <span style={{ fontSize: "14px", color: "#94a3b8" }}>Auto-Update</span>
+              <div style={{
+                padding: "4px 8px",
+                background: telemetryEnabled ? "#059669" : "#6b7280",
+                borderRadius: "12px",
+                fontSize: "12px",
+                fontWeight: "600"
+              }}>
+                {telemetryEnabled ? "Active" : "Disabled"}
+              </div>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Cycle Status Display */}
-      <div style={{ marginBottom: "20px", textAlign: "center" }}>
-        <h3>Basic Cycle Status</h3>
-        <p>
-          Phase: {cycleStatus.phase}/{cycleStatus.total} |{" "}
-          Status: {cycleStatus.running ? "Running" : "Stopped"}
-        </p>
-      </div>
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center" 
+            }}>
+              <span style={{ fontSize: "14px", color: "#94a3b8" }}>Last Poll</span>
+              <span style={{ fontSize: "14px", fontWeight: "600" }}>
+                {getTimeSinceLastUpdate()}
+              </span>
+            </div>
 
-      {/* Connection Control */}
-      <div style={{ marginBottom: "20px" }}>
-        <h3 style={{ textAlign: "center", marginBottom: "16px" }}>
-          Connection Control
-        </h3>
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <button
-            style={{
-              padding: "12px 20px",
-              background: "#06b6d4",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "120px",
-            }}
-            onClick={() => sendWebSocketCommand("connect")}
-          >
-            Check Connection
-          </button>
-        </div>
-      </div>
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center" 
+            }}>
+              <span style={{ fontSize: "14px", color: "#94a3b8" }}>Cycle Status</span>
+              <div style={{
+                padding: "4px 8px",
+                background: telemetryData?.cycle_running ? "#059669" : "#6b7280",
+                borderRadius: "12px",
+                fontSize: "12px",
+                fontWeight: "600"
+              }}>
+                {telemetryData?.cycle_running ? "running" : "idle"}
+              </div>
+            </div>
 
-      {/* Phase Control Buttons */}
-      <div style={{ marginBottom: "30px" }}>
-        <h3 style={{ textAlign: "center", marginBottom: "16px" }}>
-          Phase Control
-        </h3>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: "12px",
-            flexWrap: "wrap",
-          }}
-        >
-          <button
-            style={{
-              padding: "12px 20px",
-              background: "#22c55e",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "80px",
-            }}
-            onClick={() => sendWebSocketCommand("start")}
-          >
-            Start
-          </button>
-          <button
-            style={{
-              padding: "12px 20px",
-              background: "#ef4444",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "80px",
-            }}
-            onClick={() => sendWebSocketCommand("stop")}
-          >
-            Stop
-          </button>
-          <button
-            style={{
-              padding: "12px 20px",
-              background: "#3b82f6",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "80px",
-            }}
-            onClick={() => sendWebSocketCommand("prev")}
-          >
-            Prev
-          </button>
-          <button
-            style={{
-              padding: "12px 20px",
-              background: "#f59e0b",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "80px",
-            }}
-            onClick={() => sendWebSocketCommand("skip")}
-          >
-            Skip
-          </button>
-          <button
-            style={{
-              padding: "12px 20px",
-              background: "#8b5cf6",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "80px",
-            }}
-            onClick={() => sendWebSocketCommand("restart")}
-          >
-            Restart
-          </button>
-          <button
-            style={{
-              padding: "12px 20px",
-              background: "#6b7280",
-              color: "#fff",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              minWidth: "80px",
-            }}
-            onClick={() => sendWebSocketCommand("status")}
-          >
-            Status
-          </button>
+            <div style={{ 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center" 
+            }}>
+              <span style={{ fontSize: "14px", color: "#94a3b8" }}>Errors</span>
+              <span style={{ fontSize: "14px", fontWeight: "600", color: "#10b981" }}>
+                None
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Pin Control Section */}
-      <div>
-        <h3 style={{ textAlign: "center", marginBottom: "16px" }}>
-          Pin Control
-        </h3>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: "16px",
-            maxWidth: 600,
-            margin: "0 auto",
-          }}
-        >
+      <div style={{
+        background: "#1a1a1a",
+        border: "1px solid #333",
+        borderRadius: "12px",
+        padding: "24px"
+      }}>
+        <div style={{ 
+          display: "flex", 
+          justifyContent: "space-between", 
+          alignItems: "center",
+          marginBottom: "20px"
+        }}>
+          <h3 style={{ margin: "0", fontSize: "18px", fontWeight: "600" }}>
+            Component Control
+          </h3>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {cycleData && (
+              <div style={{
+                padding: "4px 8px",
+                background: "#059669",
+                borderRadius: "12px",
+                fontSize: "10px",
+                fontWeight: "600",
+                textTransform: "uppercase"
+              }}>
+                AUTO-STARTED
+              </div>
+            )}
+            {/* <button
+              style={{
+                padding: "8px 16px",
+                background: telemetryEnabled ? "#ef4444" : "#22c55e",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                fontWeight: "600",
+                fontSize: "12px",
+                cursor: "pointer"
+              }}
+              onClick={toggleTelemetry}
+            >
+              {telemetryEnabled ? "Stop Auto-Update" : "Start Auto-Update"}
+            </button> */}
+          </div>
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: "16px"
+        }}>
           {pins.map(({ name, pin }) => (
             <button
               key={pin}
               style={{
-                padding: "16px",
-                background: pinStates[pin] ? "#22c55e" : "#ef4444",
+                padding: "20px",
+                background: pinStates[pin] ? "#059669" : "#374151",
                 color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                fontWeight: "bold",
+                border: pinStates[pin] ? "2px solid #10b981" : "2px solid #4b5563",
+                borderRadius: "12px",
+                fontWeight: "600",
+                fontSize: "14px",
                 cursor: "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "8px"
               }}
               onClick={() => togglePin(pin)}
             >
-              {name}
-              <br />
-              {pinStates[pin] ? "ON" : "OFF"}
+              <div style={{ 
+                width: "12px", 
+                height: "12px", 
+                borderRadius: "50%",
+                background: pinStates[pin] ? "#10b981" : "#6b7280"
+              }}></div>
+              <div style={{ fontSize: "12px", textAlign: "center" }}>
+                {name.replace("_PIN", "").replace("_", " ")}
+              </div>
+              <div style={{ 
+                fontSize: "10px", 
+                color: pinStates[pin] ? "#86efac" : "#9ca3af",
+                fontWeight: "500"
+              }}>
+                Pin {pin} - {pinStates[pin] ? "ON" : "OFF"}
+              </div>
             </button>
           ))}
         </div>
