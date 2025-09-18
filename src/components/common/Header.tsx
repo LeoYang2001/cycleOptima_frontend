@@ -9,6 +9,9 @@ import {
   startAgentSession,
   useSessionContext,
 } from "../../voiceAgent/session/sessionManager";
+import { FolderOpen, Check, Settings } from "lucide-react";
+
+const LOCAL_CYCLES_PATH_KEY = "cycleOptima_local_cycles_path";
 
 function Header() {
   const { decibelLevel, startDetection } = useDecibelDetector();
@@ -18,6 +21,16 @@ function Header() {
   const lastPathRef = useRef<string | null>(null);
 
   const [isHome, setIsHome] = useState(true);
+  const [localCyclesPath, setLocalCyclesPath] = useState<string>("");
+  const [showPathModal, setShowPathModal] = useState(false);
+
+  // Load saved path from localStorage
+  useEffect(() => {
+    const savedPath = localStorage.getItem(LOCAL_CYCLES_PATH_KEY);
+    if (savedPath) {
+      setLocalCyclesPath(savedPath);
+    }
+  }, []);
 
   // Save last path
   useEffect(() => {
@@ -38,6 +51,96 @@ function Header() {
   useEffect(() => {
     setIsHome(location.pathname === "/");
   }, [location.pathname]);
+
+  // Function to select local cycles directory
+  const selectLocalCyclesDirectory = async () => {
+    if (!("showDirectoryPicker" in window)) {
+      alert(
+        "File System Access API is not supported in this browser. Please use Chrome, Edge, or another Chromium-based browser."
+      );
+      return;
+    }
+
+    try {
+      const directoryHandle = await (window as any).showDirectoryPicker({
+        mode: "readwrite", // Allow both reading and writing
+      });
+
+      // Ask user to enter the full path
+      const userPath = prompt(
+        `Please enter the full path to the "${directoryHandle.name}" directory:\n\n` +
+          `Example: C:\\Users\\labview\\Desktop\\Leo\\cycleOptima\\cycles\n\n` +
+          `This will be used for reading and writing cycle files.`,
+        `C:\\Users\\labview\\Desktop\\Leo\\cycleOptima\\${directoryHandle.name}`
+      );
+
+      if (!userPath) {
+        alert("Path is required to set the cycles directory.");
+        return;
+      }
+
+      // Validate path format (basic check)
+      if (!userPath.includes("\\") && !userPath.includes("/")) {
+        alert("Please enter a valid full path (e.g., C:\\path\\to\\directory)");
+        return;
+      }
+
+      // Save to localStorage and state
+      localStorage.setItem(LOCAL_CYCLES_PATH_KEY, userPath);
+      setLocalCyclesPath(userPath);
+      setShowPathModal(false);
+
+      alert(`Cycles directory set to: ${userPath}`);
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "name" in error &&
+        (error as any).name !== "AbortError"
+      ) {
+        console.error("Failed to select directory:", error);
+        alert("Failed to select directory");
+      }
+    }
+  };
+
+  // Function to manually edit path
+  const editCyclesPath = () => {
+    const newPath = prompt(
+      "Enter the full path to your cycles directory:",
+      localCyclesPath || "C:\\Users\\labview\\Desktop\\Leo\\cycleOptima\\cycles"
+    );
+
+    if (newPath && newPath.trim()) {
+      localStorage.setItem(LOCAL_CYCLES_PATH_KEY, newPath.trim());
+      setLocalCyclesPath(newPath.trim());
+      setShowPathModal(false);
+      alert("Cycles directory path updated!");
+    }
+  };
+
+  // Function to clear saved path
+  const clearCyclesPath = () => {
+    if (
+      confirm(
+        "Are you sure you want to clear the saved cycles directory path?"
+      )
+    ) {
+      localStorage.removeItem(LOCAL_CYCLES_PATH_KEY);
+      setLocalCyclesPath("");
+      setShowPathModal(false);
+    }
+  };
+
+  // Get display name for path (show only last 2 directories)
+  const getPathDisplayName = (path: string) => {
+    if (!path) return "No directory set";
+    const parts = path.split(/[\\\/]/);
+    if (parts.length >= 2) {
+      return `...\\${parts[parts.length - 2]}\\${parts[parts.length - 1]}`;
+    }
+    return path;
+  };
 
   return (
     <div
@@ -77,7 +180,35 @@ function Header() {
         />
       </div>
 
-      <div className="opacity-0">placeholder</div>
+      {/* Cycles Directory Indicator */}
+      <div style={isHome ? {
+        transform: "translateY(0%)",
+      } : {
+        transform: "translateY(110%)",
+        
+      }} className="flex items-center gap-3  transition-all duration-800">
+        {/* Path Indicator */}
+        <div
+          className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
+            localCyclesPath
+              ? "bg-green-900/20 border-green-600/30 hover:bg-green-800/30"
+              : "bg-yellow-900/20 border-yellow-600/30 hover:bg-yellow-800/30"
+          }`}
+          onClick={() => setShowPathModal(true)}
+          title={localCyclesPath || "Click to set cycles directory"}
+        >
+         
+          <span
+            className={`text-xs font-medium ${
+              localCyclesPath ? "text-green-300" : "text-yellow-300"
+            }`}
+          >
+            {getPathDisplayName(localCyclesPath)}
+          </span>
+        </div>
+
+     
+      </div>
 
       <div
         className={`absolute transition-all duration-800`}
@@ -89,8 +220,8 @@ function Header() {
                 transform: "translate(-50%)",
               }
             : {
-                left: "93%",
-                top: "50%",
+                left: "95%",
+                top: "30%",
                 transform: "translateY(-50%)",
               }
         }
@@ -104,6 +235,93 @@ function Header() {
           }}
         />
       </div>
+
+      {/* Path Management Modal */}
+      {showPathModal && (
+        <div
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.8)" }}
+          className="fixed inset-0 flex items-center justify-center z-[1000]"
+          onClick={() => setShowPathModal(false)}
+        >
+          <div
+            style={{ backgroundColor: "#27272a" }}
+            className="rounded-lg p-6 w-96 max-w-md mx-4 border border-gray-600"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+              <FolderOpen className="w-5 h-5" />
+              Cycles Directory
+            </h2>
+
+            <div className="space-y-4">
+              {/* Current Path Display */}
+              <div className="space-y-2">
+                <label className="block text-gray-300 text-sm font-medium">
+                  Current Directory:
+                </label>
+                <div
+                  className={`p-3 rounded-lg border text-sm ${
+                    localCyclesPath
+                      ? "bg-green-900/20 border-green-600/30 text-green-300"
+                      : "bg-gray-800 border-gray-600 text-gray-400"
+                  }`}
+                >
+                  {localCyclesPath || "No directory set"}
+                </div>
+              </div>
+
+              <div className="text-gray-400 text-xs">
+                This directory will be used for reading and writing cycle JSON
+                files.
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <button
+                  onClick={selectLocalCyclesDirectory}
+                  className="w-full p-3 rounded-lg border border-blue-600/30 bg-blue-900/20 text-blue-300 hover:bg-blue-800/30 transition-colors text-left"
+                >
+                  <div className="font-medium">Browse & Select Directory</div>
+                  <div className="text-xs text-blue-400/70 mt-1">
+                    Use file picker to select directory
+                  </div>
+                </button>
+
+                <button
+                  onClick={editCyclesPath}
+                  className="w-full p-3 rounded-lg border border-gray-600 bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors text-left"
+                >
+                  <div className="font-medium">Manually Enter Path</div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    Type the directory path directly
+                  </div>
+                </button>
+
+                {localCyclesPath && (
+                  <button
+                    onClick={clearCyclesPath}
+                    className="w-full p-3 rounded-lg border border-red-600/30 bg-red-900/20 text-red-300 hover:bg-red-800/30 transition-colors text-left"
+                  >
+                    <div className="font-medium">Clear Directory</div>
+                    <div className="text-xs text-red-400/70 mt-1">
+                      Remove saved directory path
+                    </div>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setShowPathModal(false)}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
