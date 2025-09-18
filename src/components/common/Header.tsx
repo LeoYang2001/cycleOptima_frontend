@@ -10,10 +10,23 @@ import {
   useSessionContext,
 } from "../../voiceAgent/session/sessionManager";
 import { FolderOpen, Check, Settings } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState, AppDispatch } from "../../store";
+import {
+  loadCycles,
+  setLoading,
+  setError,
+  setDirectoryPath,
+  selectLocalCycles,
+  selectLocalCyclesLoading,
+  selectLocalCyclesDirectoryPath,
+} from "../../store/localCyclesSlice";
+import type { Cycle } from "../../types/common/Cycle";
 
 const LOCAL_CYCLES_PATH_KEY = "cycleOptima_local_cycles_path";
 
 function Header() {
+  const dispatch = useDispatch<AppDispatch>();
   const { decibelLevel, startDetection } = useDecibelDetector();
   const { session, setSession } = useSessionContext();
   const location = useLocation();
@@ -24,13 +37,19 @@ function Header() {
   const [localCyclesPath, setLocalCyclesPath] = useState<string>("");
   const [showPathModal, setShowPathModal] = useState(false);
 
-  // Load saved path from localStorage
+  // Get state from Redux instead of local state
+  const localCycles = useSelector(selectLocalCycles);
+  const loadingCycles = useSelector(selectLocalCyclesLoading);
+  const savedDirectoryPath = useSelector(selectLocalCyclesDirectoryPath);
+
+  // Load saved path from localStorage and Redux
   useEffect(() => {
     const savedPath = localStorage.getItem(LOCAL_CYCLES_PATH_KEY);
     if (savedPath) {
       setLocalCyclesPath(savedPath);
+      dispatch(setDirectoryPath(savedPath));
     }
-  }, []);
+  }, [dispatch]);
 
   // Save last path
   useEffect(() => {
@@ -52,6 +71,172 @@ function Header() {
     setIsHome(location.pathname === "/");
   }, [location.pathname]);
 
+  // Function to load cycles from local directory
+  const loadCyclesFromLocalPath = async (directoryPath?: string) => {
+    if (!("showDirectoryPicker" in window)) {
+      alert(
+        "File System Access API is not supported in this browser. Please use Chrome, Edge, or another Chromium-based browser."
+      );
+      return [];
+    }
+
+    // Set loading state in Redux
+    dispatch(setLoading(true));
+
+    try {
+      // Ask user to select the directory (browser security limitation)
+      const directoryHandle = await (window as any).showDirectoryPicker({
+        mode: "read",
+      });
+
+      const cyclesFromDirectory: Cycle[] = [];
+
+      // Read all .json files from the selected directory
+      for await (const [name, handle] of directoryHandle.entries()) {
+        if (handle.kind === "file" && name.endsWith(".json")) {
+          try {
+            console.log(`Reading file: ${name}`);
+            const file = await handle.getFile();
+            const content = await file.text();
+            const cycleData = JSON.parse(content);
+
+            // Add metadata for local cycles
+            cycleData.isLocal = true;
+            cycleData.localFilePath = name;
+
+            // Ensure required fields exist (with fallbacks for missing data)
+            if (!cycleData.id) {
+              cycleData.id = `local_${Date.now()}_${Math.random()
+                .toString(36)
+                .substr(2, 9)}`;
+            }
+            if (!cycleData.displayName) {
+              cycleData.displayName = name.replace(".json", "");
+            }
+            if (!cycleData.status) {
+              cycleData.status = "draft";
+            }
+            if (!cycleData.created_at) {
+              cycleData.created_at = new Date().toISOString();
+            }
+            if (!cycleData.updated_at) {
+              cycleData.updated_at = new Date().toISOString();
+            }
+            if (!cycleData.engineer_note) {
+              cycleData.engineer_note = "Loaded from local file";
+            }
+            if (!cycleData.data) {
+              cycleData.data = { name: cycleData.displayName, phases: [] };
+            }
+            if (!cycleData.summary) {
+              cycleData.summary = null;
+            }
+            if (!cycleData.tested_at && cycleData.status === "tested") {
+              cycleData.tested_at = cycleData.updated_at;
+            }
+
+            // Validate that data.phases exists and is an array
+            if (!cycleData.data.phases || !Array.isArray(cycleData.data.phases)) {
+              cycleData.data.phases = [];
+            }
+
+            // Validate each phase structure
+            cycleData.data.phases = cycleData.data.phases.map(
+              (phase: any, index: number) => ({
+                id: phase.id || `phase_${index}`,
+                name: phase.name || `Phase ${index + 1}`,
+                color: phase.color || "06B6D4",
+                startTime: phase.startTime || 0,
+                components: Array.isArray(phase.components)
+                  ? phase.components.map((comp: any) => ({
+                      id: comp.id || `comp_${Date.now()}_${Math.random()
+                        .toString(36)
+                        .substr(2, 5)}`,
+                      label: comp.label || "Component",
+                      start: comp.start || 0,
+                      compId: comp.compId || "Unknown",
+                      duration: comp.duration || 1000,
+                      motorConfig: comp.motorConfig || null,
+                    }))
+                  : [],
+              })
+            );
+
+            cyclesFromDirectory.push(cycleData as Cycle);
+            console.log(`Successfully loaded: ${cycleData.displayName}`);
+          } catch (parseError) {
+            console.warn(`Failed to parse JSON file ${name}:`, parseError);
+
+            // Show user-friendly error for invalid JSON files
+            const shouldContinue = confirm(
+              `Failed to parse "${name}" as valid JSON.\n\n` +
+                `Error: ${(parseError as Error).message}\n\n` +
+                `Continue loading other files?`
+            );
+
+            if (!shouldContinue) {
+              throw new Error(`Stopped loading due to invalid file: ${name}`);
+            }
+          }
+        }
+      }
+
+      // Sort cycles by displayName for consistent ordering
+      cyclesFromDirectory.sort((a, b) =>
+        a.displayName.localeCompare(b.displayName)
+      );
+
+      // Save cycles to Redux store
+      dispatch(loadCycles(cyclesFromDirectory));
+
+      // Console log the actual JavaScript objects array
+      console.log("=== LOADED CYCLES FROM HEADER ===");
+      console.log("Directory path:", directoryPath);
+      console.log("Total cycles loaded:", cyclesFromDirectory.length);
+      console.log("Cycles array (full objects):", cyclesFromDirectory);
+
+      // Log each cycle object individually for better inspection
+      cyclesFromDirectory.forEach((cycle, index) => {
+        console.log(`Cycle ${index + 1}:`, cycle);
+      });
+      console.log("=== END LOADED CYCLES ===");
+
+      // Show success message with details
+      const message =
+        `Loaded ${cyclesFromDirectory.length} cycles from directory:\n\n` +
+        cyclesFromDirectory
+          .map((cycle) => `• ${cycle.displayName} (${cycle.status})`)
+          .join("\n");
+
+      if (cyclesFromDirectory.length > 0) {
+        alert(message);
+      } else {
+        alert(
+          `No valid JSON cycle files found in the selected directory.\n\nMake sure your directory contains .json files with valid cycle data.`
+        );
+      }
+
+      return directoryHandle;
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "name" in error &&
+        (error as any).name !== "AbortError"
+      ) {
+        console.error("Failed to load local cycles:", error);
+        dispatch(setError(`Failed to load cycles: ${(error as Error).message}`));
+        alert(
+          `Failed to load cycles from directory: ${directoryPath}\n\nError: ${(error as Error).message}`
+        );
+      } else {
+        console.log("User cancelled directory selection");
+        dispatch(setLoading(false));
+      }
+      return [];
+    }
+  };
+
   // Function to select local cycles directory
   const selectLocalCyclesDirectory = async () => {
     if (!("showDirectoryPicker" in window)) {
@@ -62,9 +247,9 @@ function Header() {
     }
 
     try {
-      const directoryHandle = await (window as any).showDirectoryPicker({
-        mode: "readwrite", // Allow both reading and writing
-      });
+      const directoryHandle = await loadCyclesFromLocalPath();
+
+      console.log(directoryHandle);
 
       // Ask user to enter the full path
       const userPath = prompt(
@@ -181,12 +366,18 @@ function Header() {
       </div>
 
       {/* Cycles Directory Indicator */}
-      <div style={isHome ? {
-        transform: "translateY(0%)",
-      } : {
-        transform: "translateY(110%)",
-        
-      }} className="flex items-center gap-3  transition-all duration-800">
+      <div
+        style={
+          isHome
+            ? {
+                transform: "translateY(0%)",
+              }
+            : {
+                transform: "translateY(110%)",
+              }
+        }
+        className="flex items-center gap-3  transition-all duration-800"
+      >
         {/* Path Indicator */}
         <div
           className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
@@ -197,7 +388,6 @@ function Header() {
           onClick={() => setShowPathModal(true)}
           title={localCyclesPath || "Click to set cycles directory"}
         >
-         
           <span
             className={`text-xs font-medium ${
               localCyclesPath ? "text-green-300" : "text-yellow-300"
@@ -206,8 +396,6 @@ function Header() {
             {getPathDisplayName(localCyclesPath)}
           </span>
         </div>
-
-     
       </div>
 
       <div
@@ -287,7 +475,7 @@ function Header() {
                   </div>
                 </button>
 
-                <button
+                {/* <button
                   onClick={editCyclesPath}
                   className="w-full p-3 rounded-lg border border-gray-600 bg-gray-800 text-gray-300 hover:bg-gray-700 transition-colors text-left"
                 >
@@ -295,7 +483,7 @@ function Header() {
                   <div className="text-xs text-gray-400 mt-1">
                     Type the directory path directly
                   </div>
-                </button>
+                </button> */}
 
                 {localCyclesPath && (
                   <button
