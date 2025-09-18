@@ -204,23 +204,22 @@ function CycleDetail() {
     handleCloseKeypadModal,
   ]);
 
-    // Download cycle data as JSON
+  // Download cycle data as JSON
   const handleDownload = async () => {
     if (!cycle) return;
 
     try {
-      // Create the JSON data to download
+      // Create the JSON data to download in the exact format as your file
       const cycleData = {
         id: cycle.id,
         displayName: cycle.displayName,
-        status: cycle.status,
+        data: cycle.data, // This contains name and phases
         created_at: cycle.created_at,
         updated_at: cycle.updated_at,
-        tested_at: cycle.tested_at,
         engineer_note: cycle.engineer_note,
-        data: cycle.data,
+        status: cycle.status,
         summary: cycle.summary,
-        // Add any other fields you want to include
+        tested_at: cycle.tested_at
       };
 
       // Convert to JSON string with proper formatting
@@ -234,7 +233,7 @@ function CycleDetail() {
         try {
           // Use modern File System Access API
           const fileHandle = await (window as any).showSaveFilePicker({
-            suggestedName: `${cycle.displayName.replace(/[^a-zA-Z0-9]/g, '_')}.json`,
+            suggestedName: `${cycle.displayName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}Z.json`,
             types: [{
               description: 'JSON files',
               accept: { 'application/json': ['.json'] },
@@ -326,8 +325,9 @@ function CycleDetail() {
   const fallbackDownload = (blob: Blob, fileName: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5) + 'Z';
     a.href = url;
-    a.download = `${fileName.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+    a.download = `${fileName.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
