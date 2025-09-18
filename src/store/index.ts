@@ -5,6 +5,7 @@ import storage from "redux-persist/lib/storage"; // defaults to localStorage for
 import cycleReducer from "./cycleSlice";
 import libraryReducer from "./librarySlice";
 import localCyclesSlice from "./localCyclesSlice";
+import websocketSlice from './websocketSlice';
 
 const rootPersistConfig = {
   key: "root",
@@ -18,6 +19,7 @@ export const store = configureStore({
     cycles: cycleReducer,
     library: libraryReducer,
     localCycles: localCyclesSlice, // Already persisted in the slice
+    websocket: websocketSlice, 
     // ... other reducers
   },
   middleware: (getDefaultMiddleware) =>

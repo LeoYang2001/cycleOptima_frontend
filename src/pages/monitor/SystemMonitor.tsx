@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { useSelector } from 'react-redux';
 import SensorDataPresentation from "../../components/monitor/sensorDataPresentation";
-
-const ESP32_URL = "http://192.168.4.193:8080";
-const WEBSOCKET_URL = "ws://192.168.4.193:8080/ws";
+import { websocketManager, selectWebSocketConnected, selectWebSocketLastMessage } from '../../store/websocketSlice';
 
 const pins = [
   { name: "RETRACTOR_PIN", pin: 7 },
@@ -78,6 +77,7 @@ interface CycleData {
 
 function SystemMonitor() {
   const location = useLocation();
+  const wsConnected = useSelector(selectWebSocketConnected);
   
   // Get cycle data from navigation state
   const cycleData: CycleData | null = location.state?.cycleData || null;
@@ -92,12 +92,10 @@ function SystemMonitor() {
     websocket_connected: false,
     ws_connections: 0,
   });
-  const [wsConnected, setWsConnected] = useState(false);
   const [telemetryData, setTelemetryData] = useState<TelemetryData | null>(null);
   const [telemetryEnabled, setTelemetryEnabled] = useState(false);
   const [lastTelemetryUpdate, setLastTelemetryUpdate] = useState<number>(0);
-  const websocketRef = useRef<WebSocket | null>(null);
-  const telemetryIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Add state for sensor data modal
   const [showSensorModal, setShowSensorModal] = useState(false);
 
@@ -131,108 +129,71 @@ function SystemMonitor() {
 
   // Auto-start telemetry when cycle data is available
   useEffect(() => {
-    if (cycleData && wsConnected && !telemetryEnabled) {
+    if (cycleData && !telemetryEnabled) {
       console.log("Auto-starting telemetry for loaded cycle:", cycleData.displayName);
       setTelemetryEnabled(true);
-      if (websocketRef.current) {
-        websocketRef.current.send("start_telemetry");
-      }
+      websocketManager.send("start_telemetry");
     }
-  }, [cycleData, wsConnected, telemetryEnabled]);
+  }, [cycleData, telemetryEnabled]);
 
-  // WebSocket connection setup
+  // Register message handler for system monitor
   useEffect(() => {
-    const connectWebSocket = () => {
-      try {
-        const ws = new WebSocket(WEBSOCKET_URL);
-        websocketRef.current = ws;
-
-        ws.onopen = () => {
-          console.log("WebSocket connected");
-          setWsConnected(true);
-          // Send connect command to verify and get enhanced status
-          ws.send("connect");
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            
-            // Check if this is telemetry data
-            if (data.cycle_running !== undefined && data.components && data.sensors) {
-              setTelemetryData(data as TelemetryData);
-              setLastTelemetryUpdate(Date.now());
-              
-              // Update pin states based on component data
-              const newPinStates: Record<number, boolean> = {};
-              data.components.forEach((component: any) => {
-                newPinStates[component.pin] = component.active;
-              });
-              setPinStates(newPinStates);
-            } else {
-              // Regular status data
-              setCycleStatus(data as CycleStatus);
-            }
-          } catch (err) {
-            console.error("Failed to parse WebSocket message:", err);
-          }
-        };
-
-        ws.onclose = () => {
-          console.log("WebSocket disconnected");
-          setWsConnected(false);
-          setTelemetryEnabled(false);
-          stopTelemetryPolling();
-          setCycleStatus((prev) => ({
-            ...prev,
-            websocket_connected: false,
-            ws_connections: 0,
-          }));
-          // Attempt to reconnect after 3 seconds
-          setTimeout(connectWebSocket, 3000);
-        };
-
-        ws.onerror = (error) => {
-          console.error("WebSocket error:", error);
-        };
-      } catch (err) {
-        console.error("Failed to connect WebSocket:", err);
-        setTimeout(connectWebSocket, 3000);
+    const handleSystemMessage = (data: any) => {
+      // Handle pin state updates
+      if (data.pins) {
+        const newPinStates: { [key: number]: boolean } = {};
+        data.pins.forEach((pin: any) => {
+          newPinStates[pin.pin] = pin.state;
+        });
+        setPinStates(newPinStates);
+      }
+      
+      // Handle individual pin updates
+      if (data.pin !== undefined && data.state !== undefined) {
+        setPinStates(prev => ({
+          ...prev,
+          [data.pin]: data.state
+        }));
+      }
+      
+      // Handle sensor data
+      if (data.sensorData) {
+        // Update your sensor data state
+        console.log('Sensor data received:', data.sensorData);
       }
     };
 
-    connectWebSocket();
+    // Register message handler
+    websocketManager.registerMessageHandler('systemMonitor', handleSystemMessage);
 
+    // Request initial pin states
+    if (wsConnected) {
+      websocketManager.send('get_pin_states');
+    }
+
+    // Cleanup
     return () => {
-      if (websocketRef.current) {
-        websocketRef.current.close();
-      }
-      stopTelemetryPolling();
+      websocketManager.unregisterMessageHandler('systemMonitor');
     };
-  }, []);
+  }, [wsConnected]);
 
   // Start telemetry polling
   const startTelemetryPolling = () => {
-    if (telemetryIntervalRef.current) return; // Already polling
-
-    telemetryIntervalRef.current = setInterval(() => {
-      if (websocketRef.current && wsConnected) {
-        websocketRef.current.send("get_telemetry");
-      }
-    }, 1000); // Poll every 1 second
+    if (telemetryEnabled) {
+      websocketManager.send("start_telemetry");
+    }
   };
 
   // Stop telemetry polling
   const stopTelemetryPolling = () => {
-    if (telemetryIntervalRef.current) {
-      clearInterval(telemetryIntervalRef.current);
-      telemetryIntervalRef.current = null;
+    if (telemetryEnabled) {
+      websocketManager.send("stop_telemetry");
     }
   };
 
   // Auto-start polling when telemetry is enabled
   useEffect(() => {
-    if (telemetryEnabled && wsConnected) {
+    if (telemetryEnabled) {
       startTelemetryPolling();
     } else {
       stopTelemetryPolling();
@@ -241,12 +202,12 @@ function SystemMonitor() {
     return () => {
       stopTelemetryPolling();
     };
-  }, [telemetryEnabled, wsConnected]);
+  }, [telemetryEnabled]);
 
   const sendWebSocketCommand = (command: string) => {
     console.log('send command:', command);
-    if (websocketRef.current && wsConnected) {
-      websocketRef.current.send(command);
+    if (wsConnected) {
+      websocketManager.send(command);
     } else {
       alert("WebSocket not connected");
     }
@@ -275,12 +236,24 @@ function SystemMonitor() {
   const togglePin = async (pin: number) => {
     const isOn = pinStates[pin];
     const action = isOn ? "off" : "on";
+    
     try {
-      await fetch(`${ESP32_URL}/${action}/${pin}`);
-      setPinStates((prev) => ({ ...prev, [pin]: !isOn }));
+      // Send command through global WebSocket manager
+      const success = websocketManager.send({
+        action: 'toggle_pin',
+        pin: pin,
+        state: !isOn
+      });
+
+      if (success) {
+        // Optimistically update UI
+        setPinStates((prev) => ({ ...prev, [pin]: !isOn }));
+      } else {
+        alert('Failed to send command. WebSocket not connected.');
+      }
     } catch (err) {
-      alert(`Failed to toggle pin ${pin}`);
-      console.log(err);
+      console.error(`Failed to toggle pin ${pin}:`, err);
+      alert(`Failed to toggle pin ${pin}: ${(err as Error).message}`);
     }
   };
 
@@ -855,12 +828,12 @@ function SystemMonitor() {
               <span style={{ fontSize: "14px", color: "#94a3b8" }}>ESP Connection</span>
               <div style={{
                 padding: "4px 8px",
-                background: wsConnected ? "#059669" : "#dc2626",
+                background: "#059669",
                 borderRadius: "12px",
                 fontSize: "12px",
                 fontWeight: "600"
               }}>
-                {wsConnected ? "Connected" : "Disconnected"}
+                Connected
               </div>
             </div>
 

@@ -17,6 +17,7 @@ import {
   addPhaseOptimistically,
   deletePhaseOptimistically,
 } from "../../store/cycleSlice";
+import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
 
 function CycleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +28,9 @@ function CycleDetail() {
   const cycle = useSelector((state: RootState) => selectCycleById(state, id!));
   const cycles = useSelector((state: RootState) => state.cycles.cycles);
   const cyclesLoading = useSelector((state: RootState) => state.cycles.loading);
+
+  // Get WebSocket connection status
+  const wsConnected = useSelector(selectWebSocketConnected);
 
   // Set up auto-sync (disabled for manual control)
   const { pendingCount, triggerSync } = useAutoSync({
@@ -99,46 +103,101 @@ function CycleDetail() {
 
   // Actual run function after code verification
   const executeRun = async () => {
+    console.log('executing run...', cycle);
     try {
       if (!cycle) {
         return; // No cycle to run
+      }
+
+      if (!wsConnected) {
+        alert('Not connected to system. Please check your connection and try again.');
+        return;
       }
 
       setIsRunning(true);
       setFlashCompleted(false);
       setShowKeypadModal(false);
 
-      const response = await fetch(
-        "https://cycleoptima-production.up.railway.app/api/esp/run-flash",
-        // "http://localhost:4000/api/esp/run-flash",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ cycleId: cycle.id }),
+      // Register message handler for this cycle run
+      const handleCycleRunResponse = (data: any) => {
+        console.log('Cycle run WebSocket message received:', data);
+        
+        if (data.success) {
+          console.log('Cycle run successful:', data);
+          setIsRunning(false);
+          setFlashCompleted(true);
+          
+          // Show success message briefly, then navigate to monitor
+          setTimeout(() => {
+            console.log('Navigating to monitor page with cycle data');
+            navigate("/system-monitor", {
+              state: {
+                cycleData: cycle,
+                timestamp: Date.now(),
+                autoStarted: true,
+                flashSuccess: true
+              },
+            });
+            
+            // Unregister handler
+            websocketManager.unregisterMessageHandler('cycleRun');
+          }, 1500);
+          
+        } else if (!data.success) {
+          console.error('Cycle run failed:', data);
+          setIsRunning(false);
+          setFlashCompleted(false);
+          alert(`Failed to run cycle: ${data.message || data.error || 'Unknown error'}`);
+          
+          // Unregister handler
+          websocketManager.unregisterMessageHandler('cycleRun');
+        } else if (data.type === 'cycle-run-progress' || data.action === 'cycle-run-progress') {
+          console.log('Cycle run progress:', data);
         }
-      );
+      };
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || `HTTP error! status: ${response.status}`);
+      // Register the message handler
+      websocketManager.registerMessageHandler('cycleRun', handleCycleRunResponse);
+
+      // Send cycle run command
+      const success = websocketManager.send({
+        action: 'write_json',
+        data: cycle.data,
+      });
+
+      if (!success) {
+        setIsRunning(false);
+        setFlashCompleted(false);
+        websocketManager.unregisterMessageHandler('cycleRun');
+        alert('Failed to send command. WebSocket not connected.');
       }
 
-      setIsRunning(false);
-      setFlashCompleted(true);
-
-      // Auto-hide the flash completed state after 10 seconds
+      // Set a timeout for the operation (30 seconds)
       setTimeout(() => {
-        setFlashCompleted(false);
-      }, 10000);
+        if (isRunning) {
+          console.warn('Cycle run timeout');
+          setIsRunning(false);
+          setFlashCompleted(false);
+          websocketManager.unregisterMessageHandler('cycleRun');
+          alert('Cycle run timed out. Please try again.');
+        }
+      }, 30000);
+
     } catch (error) {
       console.error("Run failed:", error);
-      setIsRunning(false); // Reset loading state on error
+      setIsRunning(false);
       setFlashCompleted(false);
+      websocketManager.unregisterMessageHandler('cycleRun');
       alert(`Failed to run cycle: ${(error as Error).message}`);
     }
   };
+
+  // Cleanup message handler when component unmounts
+  useEffect(() => {
+    return () => {
+      websocketManager.unregisterMessageHandler('cycleRun');
+    };
+  }, []);
 
   // Handle keypad input
   const handleKeypadInput = (digit: string) => {

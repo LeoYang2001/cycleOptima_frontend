@@ -15,6 +15,7 @@ import PhaseEditor from "./pages/phaseEditor/PhaseEditor";
 import "./utils/testSocket"; // Import test utility
 import { API_CONFIG, getNgrokHeaders } from "./config/api";
 import DeviceGuard from "./components/common/DeviceGuard";
+import { websocketManager } from "./store/websocketSlice";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -59,6 +60,17 @@ function App() {
 
     return () => {
       socket.disconnect();
+    };
+  }, [dispatch]);
+
+  // Initialize WebSocket connection when app starts
+  useEffect(() => {
+    console.log("Initializing WebSocket connection...");
+    websocketManager.initialize(dispatch);
+
+    // Cleanup on app unmount
+    return () => {
+      websocketManager.disconnect();
     };
   }, [dispatch]);
 
