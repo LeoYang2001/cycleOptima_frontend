@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
 import { useParams, useNavigate } from "react-router-dom";
-import { Logs, Play, X, Palette, Monitor } from "lucide-react";
+import { Logs, Play, X, Palette, Monitor, Download } from "lucide-react";
 import Note from "../../components/cycleDetail/Note";
 import Section from "../../components/common/Section";
 import CycleTimeLinePreview from "../../components/common/CycleTimeLinePreview";
@@ -204,6 +204,66 @@ function CycleDetail() {
     handleCloseKeypadModal,
   ]);
 
+    // Download cycle data as JSON
+  const handleDownload = async () => {
+    if (!cycle) return;
+
+    try {
+      // Create the JSON data to download
+      const cycleData = {
+        id: cycle.id,
+        displayName: cycle.displayName,
+        status: cycle.status,
+        created_at: cycle.created_at,
+        updated_at: cycle.updated_at,
+        tested_at: cycle.tested_at,
+        engineer_note: cycle.engineer_note,
+        data: cycle.data,
+        summary: cycle.summary,
+        // Add any other fields you want to include
+      };
+
+      // Convert to JSON string with proper formatting
+      const jsonString = JSON.stringify(cycleData, null, 2);
+      
+      // Create a blob with the JSON data
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      
+      // Check if File System Access API is available (Chrome/Edge)
+      if ('showSaveFilePicker' in window) {
+        try {
+          // Use modern File System Access API
+          const fileHandle = await (window as any).showSaveFilePicker({
+            suggestedName: `${cycle.displayName.replace(/[^a-zA-Z0-9]/g, '_')}.json`,
+            types: [{
+              description: 'JSON files',
+              accept: { 'application/json': ['.json'] },
+            }],
+          });
+          
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          
+          alert(`Cycle "${cycle.displayName}" saved successfully!`);
+        } catch (error) {
+          if ((error as Error).name !== 'AbortError') {
+            console.error('Failed to save file:', error);
+            // Fallback to traditional download
+            fallbackDownload(blob, cycle.displayName);
+          }
+        }
+      } else {
+        // Fallback for browsers that don't support File System Access API
+        fallbackDownload(blob, cycle.displayName);
+      }
+    } catch (error) {
+      console.error('Failed to download cycle:', error);
+      alert(`Failed to download cycle: ${(error as Error).message}`);
+    }
+  };
+
+
   // Sync local state with Redux state when cycle changes
   useEffect(() => {
     if (cycle) {
@@ -233,11 +293,18 @@ function CycleDetail() {
           handleMonitor();
         }
       }
+      // Add download shortcut
+      if ((e.ctrlKey || e.metaKey) && e.key === "d") {
+        e.preventDefault();
+        if (!isRunning) {
+          handleDownload();
+        }
+      }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [pendingCount, handleSave, isRunning, flashCompleted, handleRun, handleMonitor]);
+  }, [pendingCount, handleSave, isRunning, flashCompleted, handleRun, handleMonitor, handleDownload]);
 
   // Reset saving state when all changes are saved
   useEffect(() => {
@@ -254,14 +321,19 @@ function CycleDetail() {
     }
   }, [cycle, cycles, cyclesLoading, id, navigate]);
 
-  // Show loading state while cycles are being fetched
-  if (cyclesLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading cycle...</div>
-      </div>
-    );
-  }
+
+  // Fallback function for traditional downloads
+  const fallbackDownload = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${fileName.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    alert(`Cycle "${fileName}" downloaded to your default downloads folder!`);
+  };
 
   // NOW we can do conditional returns after all hooks are declared
   if (!cycle) {
@@ -397,6 +469,22 @@ function CycleDetail() {
             }}
           />
           <div className="flex items-center gap-4">
+            {/* Download Button */}
+            {!isRunning && (
+              <div
+                className="flex items-center gap-3 bg-indigo-900/20 border border-indigo-600/30 rounded-lg px-3 py-2 hover:bg-indigo-800/30 transition-colors cursor-pointer"
+                onClick={handleDownload}
+              >
+                <div className="flex items-center gap-2">
+                  <Download className="w-3 h-3 text-indigo-400" />
+                  <span className="text-indigo-300 text-sm font-medium">
+                    Download JSON
+                  </span>
+                </div>
+                <span className="text-indigo-400 text-xs opacity-70">Ctrl+D</span>
+              </div>
+            )}
+
             {/* Run/Monitor Status Indicator */}
             {isRunning ? (
               <div className="flex items-center gap-3 bg-purple-900/20 border border-purple-600/30 rounded-lg px-3 py-2">
