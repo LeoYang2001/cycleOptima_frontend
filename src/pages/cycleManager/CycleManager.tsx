@@ -220,14 +220,14 @@ function CycleManager() {
         </div>
 
         {/* Refresh button */}
-        <button
+        {/* <button
           onClick={handleRefreshCycles}
           className="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors flex items-center gap-1"
           title={`Refresh ${useLocalSource ? 'local' : 'database'} cycles`}
         >
           <RotateCcw className="w-3 h-3" />
           Refresh
-        </button>
+        </button> */}
       </div>
 
       <div className="w-full flex flex-row justify-between items-center gap-4">
