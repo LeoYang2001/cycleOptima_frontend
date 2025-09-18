@@ -249,7 +249,6 @@ function Header() {
     try {
       const directoryHandle = await loadCyclesFromLocalPath();
 
-      console.log(directoryHandle);
 
       // Ask user to enter the full path
       const userPath = prompt(

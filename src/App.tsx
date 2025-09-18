@@ -1,4 +1,3 @@
-import "./App.css";
 import MainLayout from "./MainLayout";
 import AiAssistant from "./pages/aiAssistant/AiAssistant";
 import CycleManager from "./pages/cycleManager/CycleManager";
