@@ -90,6 +90,8 @@ function SystemMonitor() {
   // Add a ref for the counter interval
   const counterIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [ifStoppingCycle, setIfStoppingCycle] = useState(false);
+
   // Get phase durations for timeline rendering
   const getPhaseTimeline = () => {
     if (!cycleData?.data.phases) return [];
@@ -187,9 +189,11 @@ function SystemMonitor() {
 
     // Handle polling interval
     if (pollingInterval) {
+      setIfStoppingCycle(true);
       setTimeout(() => {
         clearInterval(pollingInterval);
         setPollingInterval(null);
+        setIfStoppingCycle(false);
       }, 1500);
     }
   }
@@ -712,6 +716,7 @@ function SystemMonitor() {
           </h3>
 
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            {/* Start Cycle Button - Only enabled when cycle is not running */}
             <button
               style={{
                 padding: "12px 20px",
@@ -721,15 +726,21 @@ function SystemMonitor() {
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: "pointer",
+                cursor: telemetryData?.cycle_running ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px"
+                gap: "8px",
+                opacity: telemetryData?.cycle_running ? "0.5" : "1",
+                transition: "all 0.2s ease"
               }}
               onClick={handleStartCycle}
+              disabled={telemetryData?.cycle_running}
+              title={telemetryData?.cycle_running ? "Cannot start while cycle is running" : "Start cycle"}
             >
               ▶ Start Cycle
             </button>
+
+            {/* Stop Cycle Button - Only enabled when cycle is running */}
             <button
               style={{
                 padding: "12px 20px",
@@ -739,15 +750,22 @@ function SystemMonitor() {
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: "pointer",
+                cursor: !telemetryData?.cycle_running || ifStoppingCycle ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px"
+                gap: "8px",
+                opacity: !telemetryData?.cycle_running || ifStoppingCycle ? "0.5" : "1",
+                transition: "all 0.2s ease"
               }}
               onClick={handleStopCycle}
+              disabled={!telemetryData?.cycle_running || ifStoppingCycle}
+              title={!telemetryData?.cycle_running ? "No cycle running to stop" : 
+                     ifStoppingCycle ? "Stopping cycle..." : "Stop cycle"}
             >
-              ⏹ Stop Cycle
+              {ifStoppingCycle ? '⏳ Stopping...' : '⏹ Stop Cycle'}
             </button>
+
+            {/* Previous Phase Button - Only enabled when cycle is running */}
             <button
               style={{
                 padding: "12px 20px",
@@ -757,16 +775,22 @@ function SystemMonitor() {
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: "pointer",
+                cursor: !telemetryData?.cycle_running ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px"
+                gap: "8px",
+                opacity: !telemetryData?.cycle_running ? "0.5" : "1",
+                transition: "all 0.2s ease"
               }}
               onClick={() => sendWebSocketCommand("prev")}
+              disabled={!telemetryData?.cycle_running}
+              title={!telemetryData?.cycle_running ? "No cycle running" : "Go to previous phase"}
             >
               ⏮ Previous Phase
             </button>
-              <button
+
+            {/* Skip Phase Button - Only enabled when cycle is running */}
+            <button
               style={{
                 padding: "12px 20px",
                 background: "#6b7280",
@@ -775,15 +799,21 @@ function SystemMonitor() {
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: "pointer",
+                cursor: !telemetryData?.cycle_running ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px"
+                gap: "8px",
+                opacity: !telemetryData?.cycle_running ? "0.5" : "1",
+                transition: "all 0.2s ease"
               }}
               onClick={() => sendWebSocketCommand("skip")}
+              disabled={!telemetryData?.cycle_running}
+              title={!telemetryData?.cycle_running ? "No cycle running" : "Skip current phase"}
             >
               ⏭ Skip Phase
             </button>
+
+            {/* Restart Phase Button - Only enabled when cycle is running */}
             <button
               style={{
                 padding: "12px 20px",
@@ -793,17 +823,19 @@ function SystemMonitor() {
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: "pointer",
+                cursor: !telemetryData?.cycle_running ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px"
+                gap: "8px",
+                opacity: !telemetryData?.cycle_running ? "0.5" : "1",
+                transition: "all 0.2s ease"
               }}
               onClick={() => sendWebSocketCommand("restart")}
+              disabled={!telemetryData?.cycle_running}
+              title={!telemetryData?.cycle_running ? "No cycle running" : "Restart current phase"}
             >
               🔄 Restart Phase
             </button>
-            
-          
           </div>
         </div>
 
