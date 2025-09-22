@@ -65,40 +65,70 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
+    // Get the container dimensions
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * window.devicePixelRatio;
-    canvas.height = rect.height * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    
+    // Set canvas size with proper scaling
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    ctx.scale(1, 1); // Reset scale
 
-    const width = rect.width;
-    const height = rect.height;
-    const padding = 40;
-    const graphWidth = width - padding * 2;
-    const graphHeight = height - padding * 2;
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = {
+      top: 20,
+      right: 40,
+      bottom: 30,
+      left: 60
+    };
+    
+    const graphWidth = width - (padding.left + padding.right);
+    const graphHeight = height - (padding.top + padding.bottom);
 
-    // Clear canvas
-    ctx.fillStyle = '#1a1a1a';
+    // Clear canvas with background
+    ctx.fillStyle = '#0f0f0f';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw grid
-    ctx.strokeStyle = '#333';
+    // Draw grid with labels
+    ctx.strokeStyle = '#27272a';
     ctx.lineWidth = 1;
-    for (let i = 0; i <= 10; i++) {
-      const x = padding + (i / 10) * graphWidth;
-      const y = padding + (i / 10) * graphHeight;
+    ctx.textAlign = 'right';
+    ctx.font = '10px Inter';
+    ctx.fillStyle = '#64748b';
+
+    // Horizontal grid lines
+    for (let i = 0; i <= 5; i++) {
+      const y = padding.top + (i / 5) * graphHeight;
       
-      // Vertical grid lines
+      // Grid line
       ctx.beginPath();
-      ctx.moveTo(x, padding);
-      ctx.lineTo(x, height - padding);
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(width - padding.right, y);
       ctx.stroke();
       
-      // Horizontal grid lines
+      // Y-axis labels
+      const label = (100 - (i * 20)).toString();
+      ctx.fillText(label, padding.left - 8, y + 4);
+    }
+
+    // Vertical grid lines
+    const timeInterval = Math.floor(sensorHistory.length / 6);
+    for (let i = 0; i <= 6; i++) {
+      const x = padding.left + (i / 6) * graphWidth;
+      
+      // Grid line
       ctx.beginPath();
-      ctx.moveTo(padding, y);
-      ctx.lineTo(width - padding, y);
+      ctx.moveTo(x, padding.top);
+      ctx.lineTo(x, height - padding.bottom);
       ctx.stroke();
+      
+      // X-axis labels
+      if (i < 6) {
+        const dataIndex = i * timeInterval;
+        const timeDiff = Math.floor((Date.now() - sensorHistory[dataIndex]?.timestamp) / 1000);
+        ctx.textAlign = 'center';
+        ctx.fillText(`${timeDiff}s`, x, height - padding.bottom + 15);
+      }
     }
 
     // Define sensor configurations
@@ -139,9 +169,9 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
       ctx.beginPath();
 
       sensor.data.forEach((value, index) => {
-        const x = padding + (index / (sensor.data.length - 1)) * graphWidth;
+        const x = padding.left + (index / (sensor.data.length - 1)) * graphWidth;
         const normalizedValue = (value - sensor.min) / (sensor.max - sensor.min);
-        const y = height - padding - normalizedValue * graphHeight;
+        const y = height - padding.bottom - normalizedValue * graphHeight;
 
         if (index === 0) {
           ctx.moveTo(x, y);
@@ -155,9 +185,9 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
       // Draw points
       ctx.fillStyle = sensor.color;
       sensor.data.forEach((value, index) => {
-        const x = padding + (index / (sensor.data.length - 1)) * graphWidth;
+        const x = padding.left + (index / (sensor.data.length - 1)) * graphWidth;
         const normalizedValue = (value - sensor.min) / (sensor.max - sensor.min);
-        const y = height - padding - normalizedValue * graphHeight;
+        const y = height - padding.bottom - normalizedValue * graphHeight;
         
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, 2 * Math.PI);
@@ -225,8 +255,9 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
           border: '1px solid #333',
           borderRadius: '12px',
           width: '90vw',
-          maxWidth: '1200px',
-          height: '80vh',
+          maxWidth: '1400px',
+          height: '85vh',
+          maxHeight: '900px',
           display: 'flex',
           flexDirection: 'column',
           color: '#fff'
@@ -313,18 +344,22 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
 
         {/* Main Content */}
         <div style={{ 
-          flex: 1, 
+          flex: 1,
           display: 'flex',
-          padding: '24px'
+          padding: '24px',
+          minHeight: 0 // Important for preventing overflow
         }}>
-          {/* Graph */}
+          {/* Graph container */}
           <div style={{ 
-            flex: 2, 
+            flex: 2,
             marginRight: '24px',
             background: '#0f0f0f',
             borderRadius: '8px',
             border: '1px solid #333',
-            position: 'relative'
+            position: 'relative',
+            minHeight: 0, // Important for preventing overflow
+            display: 'flex',
+            flexDirection: 'column'
           }}>
             <canvas
               ref={canvasRef}
@@ -334,137 +369,131 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
                 borderRadius: '8px'
               }}
             />
-            {sensorHistory.length < 2 && (
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                color: '#64748b',
-                textAlign: 'center'
-              }}>
-                <TrendingUp size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
-                <div>Collecting sensor data...</div>
-                <div style={{ fontSize: '12px', marginTop: '4px' }}>
-                  Graph will appear once data is available
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Current Values */}
+          {/* Right sidebar - make it scrollable if needed */}
           <div style={{ 
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            gap: '16px'
+            gap: '16px',
+            overflowY: 'auto',
+            padding: '0 4px'
           }}>
-            <h3 style={{ 
-              margin: '0 0 16px 0', 
-              fontSize: '18px', 
-              fontWeight: '600',
-              color: '#fff'
+            {/* Current Values */}
+            <div style={{ 
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
             }}>
-              Current Values
-            </h3>
-
-            {latestValues ? (
-              <>
-                <div style={{
-                  padding: '16px',
-                  background: '#0f0f0f',
-                  border: '1px solid #333',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <Droplets size={16} style={{ color: '#10b981' }} />
-                    <span style={{ fontSize: '14px', color: '#94a3b8' }}>Flow Rate</span>
-                  </div>
-                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#10b981' }}>
-                    {latestValues.flowRate.toFixed(1)}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>pulses/sec</div>
-                </div>
-
-                <div style={{
-                  padding: '16px',
-                  background: '#0f0f0f',
-                  border: '1px solid #333',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <Gauge size={16} style={{ color: '#3b82f6' }} />
-                    <span style={{ fontSize: '14px', color: '#94a3b8' }}>Pressure</span>
-                  </div>
-                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#3b82f6' }}>
-                    {latestValues.pressure.toFixed(1)}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>bar</div>
-                </div>
-
-                <div style={{
-                  padding: '16px',
-                  background: '#0f0f0f',
-                  border: '1px solid #333',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <Thermometer size={16} style={{ color: '#ef4444' }} />
-                    <span style={{ fontSize: '14px', color: '#94a3b8' }}>Temperature</span>
-                  </div>
-                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#ef4444' }}>
-                    {latestValues.temperature.toFixed(1)}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>°C</div>
-                </div>
-
-                <div style={{
-                  padding: '16px',
-                  background: '#0f0f0f',
-                  border: '1px solid #333',
-                  borderRadius: '8px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <Droplets size={16} style={{ color: '#06b6d4' }} />
-                    <span style={{ fontSize: '14px', color: '#94a3b8' }}>Water Level</span>
-                  </div>
-                  <div style={{ fontSize: '24px', fontWeight: '700', color: '#06b6d4' }}>
-                    {latestValues.waterLevel.toFixed(1)}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>%</div>
-                </div>
-              </>
-            ) : (
-              <div style={{
-                padding: '20px',
-                textAlign: 'center',
-                color: '#64748b',
-                background: '#0f0f0f',
-                border: '1px solid #333',
-                borderRadius: '8px'
+              <h3 style={{ 
+                margin: '0 0 16px 0', 
+                fontSize: '18px', 
+                fontWeight: '600',
+                color: '#fff'
               }}>
-                No sensor data available
-              </div>
-            )}
+                Current Values
+              </h3>
 
-            {/* Stats */}
-            {sensorHistory.length > 0 && (
-              <div style={{
-                padding: '16px',
-                background: '#0f0f0f',
-                border: '1px solid #333',
-                borderRadius: '8px'
-              }}>
-                <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
-                  Session Stats
-                </h4>
-                <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5' }}>
-                  <div>Duration: {Math.floor((Date.now() - sensorHistory[0].timestamp) / 1000)}s</div>
-                  <div>Updates: {sensorHistory.length}</div>
-                  <div>Avg Flow: {(sensorHistory.reduce((sum, d) => sum + d.flowRate, 0) / sensorHistory.length).toFixed(1)} p/s</div>
+              {latestValues ? (
+                <>
+                  <div style={{
+                    padding: '16px',
+                    background: '#0f0f0f',
+                    border: '1px solid #333',
+                    borderRadius: '8px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <Droplets size={16} style={{ color: '#10b981' }} />
+                      <span style={{ fontSize: '14px', color: '#94a3b8' }}>Flow Rate</span>
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#10b981' }}>
+                      {latestValues.flowRate.toFixed(1)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>pulses/sec</div>
+                  </div>
+
+                  <div style={{
+                    padding: '16px',
+                    background: '#0f0f0f',
+                    border: '1px solid #333',
+                    borderRadius: '8px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <Gauge size={16} style={{ color: '#3b82f6' }} />
+                      <span style={{ fontSize: '14px', color: '#94a3b8' }}>Pressure</span>
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#3b82f6' }}>
+                      {latestValues.pressure.toFixed(1)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>bar</div>
+                  </div>
+
+                  <div style={{
+                    padding: '16px',
+                    background: '#0f0f0f',
+                    border: '1px solid #333',
+                    borderRadius: '8px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <Thermometer size={16} style={{ color: '#ef4444' }} />
+                      <span style={{ fontSize: '14px', color: '#94a3b8' }}>Temperature</span>
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#ef4444' }}>
+                      {latestValues.temperature.toFixed(1)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>°C</div>
+                  </div>
+
+                  <div style={{
+                    padding: '16px',
+                    background: '#0f0f0f',
+                    border: '1px solid #333',
+                    borderRadius: '8px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                      <Droplets size={16} style={{ color: '#06b6d4' }} />
+                      <span style={{ fontSize: '14px', color: '#94a3b8' }}>Water Level</span>
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#06b6d4' }}>
+                      {latestValues.waterLevel.toFixed(1)}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>%</div>
+                  </div>
+                </>
+              ) : (
+                <div style={{
+                  padding: '20px',
+                  textAlign: 'center',
+                  color: '#64748b',
+                  background: '#0f0f0f',
+                  border: '1px solid #333',
+                  borderRadius: '8px'
+                }}>
+                  No sensor data available
                 </div>
-              </div>
-            )}
+              )}
+
+              {/* Stats */}
+              {sensorHistory.length > 0 && (
+                <div style={{
+                  padding: '16px',
+                  background: '#0f0f0f',
+                  border: '1px solid #333',
+                  borderRadius: '8px'
+                }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
+                    Session Stats
+                  </h4>
+                  <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5' }}>
+                    <div>Duration: {Math.floor((Date.now() - sensorHistory[0].timestamp) / 1000)}s</div>
+                    <div>Updates: {sensorHistory.length}</div>
+                    <div>Avg Flow: {(sensorHistory.reduce((sum, d) => sum + d.flowRate, 0) / sensorHistory.length).toFixed(1)} p/s</div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

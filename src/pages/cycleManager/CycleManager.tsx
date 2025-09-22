@@ -267,7 +267,7 @@ function CycleManager() {
         {/* Action buttons */}
         <div className="flex items-center gap-2">
           {/* Source Toggle Button */}
-          <button
+          <div
             onClick={toggleCycleSource}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
               useLocalSource
@@ -287,7 +287,7 @@ function CycleManager() {
                 Switch to Local
               </>
             )}
-          </button>
+          </div>
 
           {/* Add New Cycle Button */}
           <Button
