@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useSelector } from 'react-redux';
 import SensorDataPresentation from "../../components/monitor/sensorDataPresentation";
-import { websocketManager, selectWebSocketConnected, selectWebSocketLastMessage } from '../../store/websocketSlice';
+import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
+import { set } from "zod";
 
 const pins = [
   { name: "RETRACTOR_PIN", pin: 7 },
@@ -15,14 +16,6 @@ const pins = [
   { name: "MOTOR_DIRECTION_PIN", pin: 10 },
 ];
 
-interface CycleStatus {
-  running: boolean;
-  phase: number;
-  total: number;
-  wifi_connected?: boolean;
-  websocket_connected?: boolean;
-  ws_connections?: number;
-}
 
 interface TelemetryData {
   cycle_running: boolean;
@@ -75,6 +68,8 @@ interface CycleData {
   tested_at: string;
 }
 
+
+
 function SystemMonitor() {
   const location = useLocation();
   const wsConnected = useSelector(selectWebSocketConnected);
@@ -84,30 +79,16 @@ function SystemMonitor() {
   const timestamp = location.state?.timestamp || null;
 
   const [pinStates, setPinStates] = useState<Record<number, boolean>>({});
-  const [cycleStatus, setCycleStatus] = useState<CycleStatus>({
-    running: false,
-    phase: 1,
-    total: 8,
-    wifi_connected: false,
-    websocket_connected: false,
-    ws_connections: 0,
-  });
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   const [telemetryData, setTelemetryData] = useState<TelemetryData | null>(null);
-  const [telemetryEnabled, setTelemetryEnabled] = useState(false);
-  const [lastTelemetryUpdate, setLastTelemetryUpdate] = useState<number>(0);
 
   // Add state for sensor data modal
   const [showSensorModal, setShowSensorModal] = useState(false);
 
-  // Calculate total cycle duration from phase data
-  const calculateTotalDuration = (phases: Phase[]): number => {
-    return phases.reduce((total, phase) => {
-      const phaseDuration = phase.components.reduce((phaseTotal, component) => {
-        return Math.max(phaseTotal, component.start + component.duration);
-      }, 0);
-      return total + phaseDuration;
-    }, 0);
-  };
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  // Add a ref for the counter interval
+  const counterIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get phase durations for timeline rendering
   const getPhaseTimeline = () => {
@@ -127,128 +108,40 @@ function SystemMonitor() {
     });
   };
 
-  // Auto-start telemetry when cycle data is available
-  useEffect(() => {
-    if (cycleData && !telemetryEnabled) {
-      console.log("Auto-starting telemetry for loaded cycle:", cycleData.displayName);
-      setTelemetryEnabled(true);
-      websocketManager.send("start_telemetry");
-    }
-  }, [cycleData, telemetryEnabled]);
 
-  // Register message handler for system monitor
-  useEffect(() => {
-    const handleSystemMessage = (data: any) => {
-      // Handle pin state updates
-      if (data.pins) {
-        const newPinStates: { [key: number]: boolean } = {};
-        data.pins.forEach((pin: any) => {
-          newPinStates[pin.pin] = pin.state;
-        });
-        setPinStates(newPinStates);
-      }
-      
-      // Handle individual pin updates
-      if (data.pin !== undefined && data.state !== undefined) {
-        setPinStates(prev => ({
-          ...prev,
-          [data.pin]: data.state
-        }));
-      }
-      
-      // Handle sensor data
-      if (data.sensorData) {
-        // Update your sensor data state
-        console.log('Sensor data received:', data.sensorData);
-      }
-    };
-
-    // Register message handler
-    websocketManager.registerMessageHandler('systemMonitor', handleSystemMessage);
-
-    // Request initial pin states
-    if (wsConnected) {
-      websocketManager.send('get_pin_states');
-    }
-
-    // Cleanup
-    return () => {
-      websocketManager.unregisterMessageHandler('systemMonitor');
-    };
-  }, [wsConnected]);
-
-  // Start telemetry polling
-  const startTelemetryPolling = () => {
-    if (telemetryEnabled) {
-      websocketManager.send("start_telemetry");
-    }
-  };
-
-  // Stop telemetry polling
-  const stopTelemetryPolling = () => {
-    if (telemetryEnabled) {
-      websocketManager.send("stop_telemetry");
-    }
-  };
-
-  // Auto-start polling when telemetry is enabled
-  useEffect(() => {
-    if (telemetryEnabled) {
-      startTelemetryPolling();
-    } else {
-      stopTelemetryPolling();
-    }
-
-    return () => {
-      stopTelemetryPolling();
-    };
-  }, [telemetryEnabled]);
-
+  // Update the sendWebSocketCommand function
   const sendWebSocketCommand = (command: string) => {
     console.log('send command:', command);
     if (wsConnected) {
-      websocketManager.send(command);
+      if (command === 'start') {
+        // Start command sent - polling will begin when we receive acknowledgment
+        websocketManager.send(command);
+      } else if (command === 'stop') {
+        websocketManager.send(command);
+      } else {
+        websocketManager.send(command);
+      }
     } else {
       alert("WebSocket not connected");
     }
   };
 
-  const toggleTelemetry = () => {
-    if (telemetryEnabled) {
-      sendWebSocketCommand("stop_telemetry");
-      setTelemetryEnabled(false);
-      stopTelemetryPolling();
-    } else {
-      sendWebSocketCommand("start_telemetry");
-      setTelemetryEnabled(true);
-      // Polling will start automatically via useEffect
-    }
-  };
-
-  const getTelemetrySnapshot = () => {
-    sendWebSocketCommand("get_telemetry");
-  };
-
-  const sendPing = () => {
-    sendWebSocketCommand("ping");
-  };
-
+  // Update the togglePin function to check cycle status
   const togglePin = async (pin: number) => {
+    // Don't allow toggling if cycle is running
+    if (telemetryData?.cycle_running) {
+      console.log('Cannot toggle pins while cycle is running');
+      return;
+    }
+
     const isOn = pinStates[pin];
-    const action = isOn ? "off" : "on";
+    const command = `gpio:${pin}:${isOn ? '0' : '1'}`;
     
     try {
-      // Send command through global WebSocket manager
-      const success = websocketManager.send({
-        action: 'toggle_pin',
-        pin: pin,
-        state: !isOn
-      });
-
+      const success = websocketManager.send(command);
       if (success) {
-        // Optimistically update UI
         setPinStates((prev) => ({ ...prev, [pin]: !isOn }));
-      } else {
+      } else {  
         alert('Failed to send command. WebSocket not connected.');
       }
     } catch (err) {
@@ -264,14 +157,61 @@ function SystemMonitor() {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getTimeSinceLastUpdate = (): string => {
-    if (lastTelemetryUpdate === 0) return "Never";
-    const diff = Math.floor((Date.now() - lastTelemetryUpdate) / 1000);
-    return `${diff}s ago`;
+
+  const handleStartCycle = () => {
+    // Clear any existing interval first
+    if (counterIntervalRef.current) {
+      clearInterval(counterIntervalRef.current);
+      counterIntervalRef.current = null;
+    }
+
+    sendWebSocketCommand("start");
+    startPolling();
+
+    // Start elapsed time counter
+    setElapsedTime(0);
+    counterIntervalRef.current = setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+  };
+
+  const handleStopCycle = () => {
+    sendWebSocketCommand("stop");
+
+    // Stop elapsed time counter
+    if (counterIntervalRef.current) {
+      clearInterval(counterIntervalRef.current);
+      counterIntervalRef.current = null;
+    }
+    setElapsedTime(0);
+
+    // Handle polling interval
+    if (pollingInterval) {
+      setTimeout(() => {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }, 1500);
+    }
+  }
+
+  // Update the startPolling function
+  const startPolling = () => {
+    if (wsConnected) {
+      console.log('Starting telemetry polling...');
+      const interval = setInterval(() => {
+        websocketManager.send('get_telemetry');
+        if (!pollingInterval) {
+          setPollingInterval(interval);
+        }
+      }, 1000);
+
+      // Initial request
+      websocketManager.send('get_telemetry');
+    }
   };
 
   const calculateProgress = () => {
-    if (!telemetryData) return 0;
+    if (!telemetryData || !telemetryData.total_phases ||  telemetryData.total_phases === 0) return 0;
     return (telemetryData.current_phase / telemetryData.total_phases) * 100;
   };
 
@@ -282,6 +222,68 @@ function SystemMonitor() {
       console.log("Flash completed at:", new Date(timestamp));
     }
   }, [cycleData, timestamp]);
+
+  // Update the useEffect hook to handle WebSocket messages
+  useEffect(() => {
+    const handleSystemMessage = (data: any) => {
+      try {
+        // Handle telemetry data response
+        if (data.cycle_running !== undefined) {
+          console.log('Telemetry data received:', data);
+          setTelemetryData(data);
+          
+          // Update pin states from components array
+          if (data.components && Array.isArray(data.components)) {
+            const newPinStates: { [key: number]: boolean } = {};
+            data.components.forEach((component: { pin: number; active: boolean }) => {
+              newPinStates[component.pin] = component.active;
+            });
+            setPinStates(newPinStates);
+          }
+        }
+        else if(!data.success && data.type === 'telemetry'){
+
+          //cycle stop, reset telemetry data
+          const resetData: TelemetryData = {
+            ...telemetryData,
+            cycle_running: false,
+            current_phase: 0,
+            total_phases: telemetryData?.total_phases ?? 0,
+            current_phase_name: telemetryData?.current_phase_name ?? "",
+            elapsed_seconds: telemetryData?.elapsed_seconds ?? 0,
+            components: telemetryData?.components ?? [],
+            sensors: telemetryData?.sensors ?? { flow_sensor_pin3: 0 },
+            timestamp: telemetryData?.timestamp ?? Date.now()
+          };
+          setTelemetryData(resetData);
+
+
+          //reset pins
+          setPinStates({});
+          console.log('reset pin states')
+        }
+      } catch (error) {
+        console.error('Error processing system message:', error);
+      }
+    };
+
+    // Register message handler
+    websocketManager.registerMessageHandler('systemMonitor', handleSystemMessage);
+
+    // Cleanup function
+    return () => {
+      websocketManager.unregisterMessageHandler('systemMonitor');
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
+      // Add cleanup for counter interval
+      if (counterIntervalRef.current) {
+        clearInterval(counterIntervalRef.current);
+        counterIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const phaseTimeline = getPhaseTimeline();
 
@@ -399,10 +401,10 @@ function SystemMonitor() {
               marginBottom: "8px" 
             }}>
               <span style={{ fontSize: "14px", color: "#94a3b8" }}>
-                Current Phase: {telemetryData?.current_phase_name || "Unknown"}
+                Current Phase:
               </span>
               <span style={{ fontSize: "14px", fontWeight: "600" }}>
-                Phase {telemetryData?.current_phase || 1} of {telemetryData?.total_phases || phaseTimeline.length}
+                Phase {telemetryData?.current_phase } of {telemetryData?.total_phases || phaseTimeline.length}
               </span>
             </div>
             <div style={{
@@ -414,7 +416,7 @@ function SystemMonitor() {
               <div style={{
                 background: "#22c55e",
                 height: "100%",
-                width: "75%"
+                width: `${(telemetryData && telemetryData.total_phases) ? (telemetryData.current_phase / telemetryData.total_phases) * 100 : 0}%`,
               }}></div>
             </div>
           </div>
@@ -514,7 +516,8 @@ function SystemMonitor() {
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: "32px", fontWeight: "700", color: "#fff" }}>
-                {telemetryData ? formatElapsedTime(telemetryData.elapsed_seconds) : "00:00:00"}
+                {/* use local timestamp  */}
+                {formatElapsedTime(elapsedTime)}
               </div>
               <div style={{ fontSize: "12px", color: "#64748b" }}>Elapsed Time</div>
             </div>
@@ -723,7 +726,7 @@ function SystemMonitor() {
                 alignItems: "center",
                 gap: "8px"
               }}
-              onClick={() => sendWebSocketCommand("start")}
+              onClick={handleStartCycle}
             >
               ▶ Start Cycle
             </button>
@@ -741,7 +744,7 @@ function SystemMonitor() {
                 alignItems: "center",
                 gap: "8px"
               }}
-              onClick={() => sendWebSocketCommand("stop")}
+              onClick={handleStopCycle}
             >
               ⏹ Stop Cycle
             </button>
@@ -828,42 +831,16 @@ function SystemMonitor() {
               <span style={{ fontSize: "14px", color: "#94a3b8" }}>ESP Connection</span>
               <div style={{
                 padding: "4px 8px",
-                background: "#059669",
+                background: wsConnected ? "#059669" : "#dc2626",
                 borderRadius: "12px",
                 fontSize: "12px",
                 fontWeight: "600"
               }}>
-                Connected
+                {wsConnected ? "Connected" : "Disconnected"}
               </div>
             </div>
 
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center" 
-            }}>
-              <span style={{ fontSize: "14px", color: "#94a3b8" }}>Auto-Update</span>
-              <div style={{
-                padding: "4px 8px",
-                background: telemetryEnabled ? "#059669" : "#6b7280",
-                borderRadius: "12px",
-                fontSize: "12px",
-                fontWeight: "600"
-              }}>
-                {telemetryEnabled ? "Active" : "Disabled"}
-              </div>
-            </div>
-
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center" 
-            }}>
-              <span style={{ fontSize: "14px", color: "#94a3b8" }}>Last Poll</span>
-              <span style={{ fontSize: "14px", fontWeight: "600" }}>
-                {getTimeSinceLastUpdate()}
-              </span>
-            </div>
+       
 
             <div style={{ 
               display: "flex", 
@@ -878,7 +855,7 @@ function SystemMonitor() {
                 fontSize: "12px",
                 fontWeight: "600"
               }}>
-                {telemetryData?.cycle_running ? "running" : "idle"}
+                {telemetryData?.cycle_running ? "Running" : "Idle"}
               </div>
             </div>
 
@@ -925,21 +902,7 @@ function SystemMonitor() {
                 AUTO-STARTED
               </div>
             )}
-            {/* <button
-              style={{
-                padding: "8px 16px",
-                background: telemetryEnabled ? "#ef4444" : "#22c55e",
-                color: "#fff",
-                border: "none",
-                borderRadius: "6px",
-                fontWeight: "600",
-                fontSize: "12px",
-                cursor: "pointer"
-              }}
-              onClick={toggleTelemetry}
-            >
-              {telemetryEnabled ? "Stop Auto-Update" : "Start Auto-Update"}
-            </button> */}
+           
           </div>
         </div>
 
@@ -959,14 +922,17 @@ function SystemMonitor() {
                 borderRadius: "12px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: "pointer",
+                cursor: telemetryData?.cycle_running ? "not-allowed" : "pointer",
                 transition: "all 0.2s ease",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: "8px"
+                gap: "8px",
+                opacity: telemetryData?.cycle_running ? "0.7" : "1"
               }}
               onClick={() => togglePin(pin)}
+              disabled={telemetryData?.cycle_running}
+              title={telemetryData?.cycle_running ? "Cannot toggle components while cycle is running" : ""}
             >
               <div style={{ 
                 width: "12px", 

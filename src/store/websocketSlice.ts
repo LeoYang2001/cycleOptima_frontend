@@ -10,6 +10,7 @@ interface WebSocketState {
   lastMessage: any;
   connectionAttempts: number;
   maxReconnectAttempts: number;
+  url: string;
 }
 
 const initialState: WebSocketState = {
@@ -19,6 +20,7 @@ const initialState: WebSocketState = {
   lastMessage: null,
   connectionAttempts: 0,
   maxReconnectAttempts: 5,
+  url: WEBSOCKET_URL,
 };
 
 const websocketSlice = createSlice({
@@ -64,6 +66,11 @@ const websocketSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+
+    // Update WebSocket URL
+    updateWebSocketUrl: (state, action: PayloadAction<string>) => {
+      state.url = `${action.payload}`;
+    },
   },
 });
 
@@ -75,6 +82,7 @@ export const {
   messageReceived,
   resetConnectionAttempts,
   clearError,
+  updateWebSocketUrl,
 } = websocketSlice.actions;
 
 // Selectors
@@ -95,6 +103,9 @@ export const selectConnectionAttempts = (state: { websocket: WebSocketState }) =
 
 export const selectMaxReconnectAttempts = (state: { websocket: WebSocketState }) => 
   state.websocket.maxReconnectAttempts;
+
+export const selectWebSocketUrl = (state: { websocket: WebSocketState }) => 
+  state.websocket.url;
 
 export default websocketSlice.reducer;
 
@@ -136,7 +147,11 @@ export class WebSocketManager {
     this.dispatch(startConnecting());
     
     try {
-      this.ws = new WebSocket(WEBSOCKET_URL);
+      // Get current WebSocket URL from state
+      const state = this.dispatch((dispatch: any, getState: any) => getState().websocket);
+      const wsUrl = state.url;
+      
+      this.ws = new WebSocket(wsUrl);
       this.setupEventListeners();
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
