@@ -9,7 +9,7 @@ import {
   startAgentSession,
   useSessionContext,
 } from "../../voiceAgent/session/sessionManager";
-import { FolderOpen, Check, Settings, Wifi, WifiOff, RotateCcw } from "lucide-react";
+import { FolderOpen, Check, Settings, Wifi, WifiOff, RotateCcw, X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
 import {
@@ -27,7 +27,9 @@ import {
   selectWebSocketError,
   selectConnectionAttempts,
   selectMaxReconnectAttempts,
-  websocketManager
+  websocketManager,
+  updateWebSocketUrl,
+  selectWebSocketUrl
 } from "../../store/websocketSlice";
 import type { Cycle } from "../../types/common/Cycle";
 
@@ -41,14 +43,6 @@ function Header() {
   const navigate = useNavigate();
   const lastPathRef = useRef<string | null>(null);
 
-  const [isHome, setIsHome] = useState(true);
-  const [localCyclesPath, setLocalCyclesPath] = useState<string>("");
-  const [showPathModal, setShowPathModal] = useState(false);
-
-  // Get state from Redux
-  const localCycles = useSelector(selectLocalCycles);
-  const loadingCycles = useSelector(selectLocalCyclesLoading);
-  const savedDirectoryPath = useSelector(selectLocalCyclesDirectoryPath);
   
   // WebSocket connection state from Redux
   const wsConnected = useSelector(selectWebSocketConnected);
@@ -56,6 +50,19 @@ function Header() {
   const wsError = useSelector(selectWebSocketError);
   const connectionAttempts = useSelector(selectConnectionAttempts);
   const maxReconnectAttempts = useSelector(selectMaxReconnectAttempts);
+  const wsUrl = useSelector(selectWebSocketUrl);
+
+  const [isHome, setIsHome] = useState(true);
+  const [localCyclesPath, setLocalCyclesPath] = useState<string>("");
+  const [showPathModal, setShowPathModal] = useState(false);
+  const [showWsConfigModal, setShowWsConfigModal] = useState(false);
+  const [newWsUrl, setNewWsUrl] = useState(wsUrl);
+
+  // Get state from Redux
+  const localCycles = useSelector(selectLocalCycles);
+  const loadingCycles = useSelector(selectLocalCyclesLoading);
+  const savedDirectoryPath = useSelector(selectLocalCyclesDirectoryPath);
+  
 
   // Load saved path from localStorage and Redux
   useEffect(() => {
@@ -378,6 +385,25 @@ function Header() {
 
   const wsStatus = getWebSocketStatus();
 
+  // Add this function to handle IP input
+  const handleWsUrlChange = (value: string) => {
+    setNewWsUrl(value);
+  };
+
+  // Add this function to handle save
+  const handleSaveWsConfig = () => {
+    // Basic validation for WebSocket URL format
+    const wsUrlPattern = /^ws:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+\/ws$/;
+    if (!wsUrlPattern.test(newWsUrl)) {
+      alert('Please enter a valid WebSocket URL in the format: ws://xxx.xxx.xxx.xxx:xxxx/ws');
+      return;
+    }
+    
+    dispatch(updateWebSocketUrl(newWsUrl));
+    websocketManager.reconnect();
+    setShowWsConfigModal(false);
+  };
+
   return (
     <div
       style={{
@@ -434,10 +460,10 @@ function Header() {
           className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
             wsStatus.bgColor
           } ${wsStatus.borderColor} ${wsStatus.hoverColor}`}
-          onClick={!wsConnected && !wsConnecting ? handleReconnect : undefined}
+          onClick={() => setShowWsConfigModal(true)}
           title={
             wsError 
-              ? `WebSocket Error: ${wsError}${!wsConnected && !wsConnecting ? ' (Click to retry)' : ''}`
+              ? `WebSocket Error: ${wsError}${!wsConnected && !wsConnecting ? ' (Click to configure)' : ''}`
               : `ESP32 Connection: ${wsStatus.text}`
           }
         >
@@ -539,7 +565,7 @@ function Header() {
 
               {/* Action Buttons */}
               <div className="space-y-2">
-                <button
+                <div
                   onClick={selectLocalCyclesDirectory}
                   className="w-full p-3 rounded-lg border border-gray-600/50 bg-gray-800/80 text-gray-300 hover:bg-gray-700/80 hover:border-gray-500/50 transition-colors text-left"
                 >
@@ -547,10 +573,10 @@ function Header() {
                   <div className="text-xs text-gray-400 mt-1">
                     Use file picker to select directory
                   </div>
-                </button>
+                </div>
 
                 {localCyclesPath && (
-                  <button
+                  <div
                     onClick={clearCyclesPath}
                     className="w-full p-3 rounded-lg border border-gray-600/50 bg-gray-800/80 text-red-300 hover:bg-red-900/20 hover:border-red-600/30 transition-colors text-left"
                   >
@@ -558,18 +584,99 @@ function Header() {
                     <div className="text-xs text-red-400/70 mt-1">
                       Remove saved directory path
                     </div>
-                  </button>
+                  </div>
                 )}
               </div>
             </div>
 
             <div className="flex justify-end mt-6">
-              <button
+              <div
                 onClick={() => setShowPathModal(false)}
                 className="px-4 py-2 bg-gray-700/80 text-gray-300 rounded hover:bg-gray-600/80 transition-colors border border-gray-600/50"
               >
                 Close
-              </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WebSocket Configuration Modal */}
+      {showWsConfigModal && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-[1000] bg-black/80"
+          onClick={() => setShowWsConfigModal(false)}
+        >
+          <div
+            className="w-[600px] max-w-[95vw] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800">
+              <h2 className="text-xl font-semibold text-gray-100 flex items-center gap-2">
+                <Settings className="w-5 h-5 text-indigo-400" />
+                WebSocket Configuration
+              </h2>
+              <div
+                onClick={() => setShowWsConfigModal(false)}
+                className="p-1 hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Current URL Display */}
+              <div className="space-y-2">
+                <label className="block text-gray-400 text-sm font-medium">
+                  Current WebSocket URL
+                </label>
+                <div className="p-3 rounded-lg border text-sm bg-gray-800/50 border-gray-700 text-gray-300 font-mono">
+                  {wsUrl}
+                </div>
+              </div>
+
+              {/* WebSocket URL Input */}
+              <div className="space-y-3">
+                <label className="block text-gray-400 text-sm font-medium">
+                  New WebSocket URL
+                </label>
+                <input
+                  type="text"
+                  value={newWsUrl}
+                  onChange={(e) => handleWsUrlChange(e.target.value)}
+                  placeholder="ws://xxx.xxx.xxx.xxx:xxxx/ws"
+                  className="w-full h-12 px-4 bg-gray-800 border border-gray-700 rounded-lg
+                           text-gray-100 font-mono text-lg
+                           focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                           transition-colors"
+                  autoFocus
+                />
+                <div className="text-gray-500 text-xs">
+                  Format: ws://xxx.xxx.xxx.xxx:xxxx/ws (Example: ws://192.168.4.193:8080/ws)
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-800 bg-gray-900/50">
+              <div
+                onClick={() => setShowWsConfigModal(false)}
+                className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg
+                         border border-gray-700 hover:bg-gray-700
+                         transition-colors text-sm font-medium"
+              >
+                Cancel
+              </div>
+              <div
+                onClick={handleSaveWsConfig}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg
+                         border border-indigo-500 hover:bg-indigo-500
+                         transition-colors text-sm font-medium"
+              >
+                Save & Reconnect
+              </div>
             </div>
           </div>
         </div>
