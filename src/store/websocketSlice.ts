@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
-const WEBSOCKET_URL = "wss://192.168.4.137/ws";
+const WEBSOCKET_URL = "wss://192.168.4.137:8443/ws";
 
 interface WebSocketState {
   connected: boolean;
