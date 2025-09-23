@@ -1,27 +1,26 @@
 import React, { useState, useEffect } from "react";
 import { PlaceholdersAndVanishInput } from "../../components/ui/placeholders-and-vanish-input";
 import Button from "../../components/common/Button";
-import { PlusIcon, Database, FolderOpen, RotateCcw } from "lucide-react";
+import { PlusIcon, FolderOpen, RotateCcw } from "lucide-react";
 import Dropdown from "../../components/common/Dropdown";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
 import { getEmbedding } from "../../apis/embedText";
 import { getSemanticSearchResults } from "../../utils/semanticSearch";
 import { X } from "lucide-react";
-import { ClipLoader, PuffLoader } from "react-spinners";
+import { PuffLoader } from "react-spinners";
 import CycleFile from "../../components/cycleManager/CycleFile";
-import { addNewCycle } from "../../apis/cycles";
-import { fetchCycles } from "../../store/cycleSlice";
 import { 
   selectLocalCycles, 
   selectLocalCyclesLoading, 
   selectLocalCyclesDirectoryPath,
-  
 } from "../../store/localCyclesSlice";
+import { useNavigate } from "react-router-dom";
+import { updateCycleOptimistically } from "../../store/cycleSlice"; // Add this import at the top
+import type { Cycle } from "../../types/common/Cycle";
 
 const statusOptions = ["all status", "draft", "tested"];
 const CYCLES_PER_PAGE = 30; // 6 cols * 5 rows
-const CYCLE_SOURCE_KEY = "cycleOptima_cycle_source"; // localStorage key for source preference
 
 function CycleManager() {
   const [inputVal, setInputVal] = useState("");
@@ -34,61 +33,27 @@ function CycleManager() {
   const [isAddingCycle, setIsAddingCycle] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCycleName, setNewCycleName] = useState("");
-  
-  // Cycle source state (local or database)
-  const [useLocalSource, setUseLocalSource] = useState(false);
 
-  // Redux selectors for both sources
-  const databaseCycles = useSelector((state: RootState) => state.cycles.cycles);
+  const navigate = useNavigate()
+
+  // Redux selectors for local cycles only
   const localCycles = useSelector(selectLocalCycles);
   const localCyclesLoading = useSelector(selectLocalCyclesLoading);
   const localDirectoryPath = useSelector(selectLocalCyclesDirectoryPath);
-  
+
   const dispatch = useDispatch<AppDispatch>();
 
-  // Load saved source preference on component mount
-  useEffect(() => {
-    const savedSource = localStorage.getItem(CYCLE_SOURCE_KEY);
-    if (savedSource === "local") {
-      setUseLocalSource(true);
-    }
-  }, []);
+  // Get active cycles from local only
+  const activeCycles = localCycles;
+  const isLoading = localCyclesLoading;
 
-  // Get active cycles based on current source
-  const activeCycles = useLocalSource ? localCycles : databaseCycles;
-  const isLoading = useLocalSource ? localCyclesLoading : false;
-
-  // Toggle between local and database source
-  const toggleCycleSource = () => {
-    const newSource = !useLocalSource;
-    setUseLocalSource(newSource);
-    
-    // Save preference to localStorage
-    localStorage.setItem(CYCLE_SOURCE_KEY, newSource ? "local" : "database");
-    
-    // Clear search when switching sources
-    handleClearSearch();
-    
-    console.log(`Switched to ${newSource ? "local" : "database"} cycle source`);
-  };
-
-  // Refresh cycles based on current source
+  // Refresh cycles from local folder
   const handleRefreshCycles = () => {
-    if (useLocalSource) {
-      // Trigger refresh of local cycles (this would need to be implemented in the Header component)
-      window.dispatchEvent(new CustomEvent('refreshLocalCycles'));
-    } else {
-      // Refresh database cycles
-      dispatch(fetchCycles());
-    }
+    window.dispatchEvent(new CustomEvent('refreshLocalCycles'));
   };
 
   // Handler for opening add new cycle modal
   const handleAddNewCycle = () => {
-    if (useLocalSource) {
-      alert("Adding new cycles is not available in local mode. Please switch to database mode or add JSON files directly to your local directory.");
-      return;
-    }
     setShowAddModal(true);
     setNewCycleName("");
   };
@@ -96,7 +61,7 @@ function CycleManager() {
   // Handler for submitting the new cycle form
   const handleSubmitNewCycle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCycleName.trim() || useLocalSource) return;
+    if (!newCycleName.trim()) return;
 
     // Check for duplicate cycle names
     const trimmedName = newCycleName.trim();
@@ -115,9 +80,47 @@ function CycleManager() {
     setShowAddModal(false);
 
     try {
-      const result = await addNewCycle(trimmedName);
-      console.log("New cycle created:", result);
-      dispatch(fetchCycles());
+      // Generate a temporary ID for the new cycle
+      const tempId = `temp-${Date.now()}`;
+
+      // Prepare template data for the new cycle
+      const now = new Date().toISOString();
+      const templateCycle:Cycle = {
+        id: tempId,
+        displayName: trimmedName,
+        data: {
+          phases: [
+            {
+              id: "1755269543284",
+              name: "phase1",
+              color: "4ADE80",
+              startTime: 0,
+              components: [
+                {
+                  id: "1756939954770",
+                  label: "Standard Retractor Cycle",
+                  start: 0,
+                  compId: "Retractor",
+                  duration: 60000,
+                  motorConfig: undefined
+                }
+              ]
+            }
+          ],
+        },
+        status: "draft",
+        created_at: now,
+        updated_at: now,
+        tested_at: null,
+        engineer_note: "",
+        summary: "",
+      };
+
+      // Add the new cycle to Redux
+      dispatch(updateCycleOptimistically(templateCycle));
+
+      // Navigate to the detail page
+      navigate(`/cycle/${tempId}`, { state: { cycle: templateCycle, isNew: true } });
     } catch (error) {
       console.error("Failed to create new cycle:", error);
       alert("Failed to create new cycle: " + (error as Error).message);
@@ -202,32 +205,15 @@ function CycleManager() {
       <div className="w-full flex flex-row justify-between items-center gap-4 mb-4">
         <div className="flex items-center gap-3">
           {/* Source Indicator */}
-          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-            useLocalSource 
-              ? 'bg-blue-900/30 text-blue-300 border border-blue-600/30' 
-              : 'bg-green-900/30 text-green-300 border border-green-600/30'
-          }`}>
-            {useLocalSource 
-              ? `Local: ${localDirectoryPath ? '...' + localDirectoryPath.slice(-20) : 'No directory'}`
-              : 'Database'
-            }
+          <div className={`px-3 py-1 rounded-full text-xs font-medium bg-blue-900/30 text-blue-300 border border-blue-600/30`}>
+            {`Local: ${localDirectoryPath ? '...' + localDirectoryPath.slice(-20) : 'No directory'}`}
           </div>
-          
           {/* Cycle count */}
           <div className="text-gray-400 text-sm">
             {activeCycles.length} cycle{activeCycles.length !== 1 ? 's' : ''}
           </div>
         </div>
-
-        {/* Refresh button */}
-        {/* <button
-          onClick={handleRefreshCycles}
-          className="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors flex items-center gap-1"
-          title={`Refresh ${useLocalSource ? 'local' : 'database'} cycles`}
-        >
-          <RotateCcw className="w-3 h-3" />
-          Refresh
-        </button> */}
+       
       </div>
 
       <div className="w-full flex flex-row justify-between items-center gap-4">
@@ -263,40 +249,15 @@ function CycleManager() {
             </div>
           )}
         </div>
-
-        {/* Action buttons */}
-        <div className="flex items-center gap-2">
-          {/* Source Toggle Button */}
-          <div
-            onClick={toggleCycleSource}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-              useLocalSource
-                ? 'bg-blue-900/20 border-blue-600/30 text-blue-300 hover:bg-blue-800/30'
-                : 'bg-green-900/20 border-green-600/30 text-green-300 hover:bg-green-800/30'
-            }`}
-            title={`Switch to ${useLocalSource ? 'database' : 'local'} mode`}
-          >
-            {useLocalSource ? (
-              <>
-                <Database className="w-4 h-4" />
-                Switch to DB
-              </>
-            ) : (
-              <>
-                <FolderOpen className="w-4 h-4" />
-                Switch to Local
-              </>
-            )}
-          </div>
-
-          {/* Add New Cycle Button */}
+        {/* Add New Cycle and Refresh Buttons Side by Side */}
+        <div className="flex flex-row gap-2 items-center">
           <Button
             func={handleAddNewCycle}
             theme="dark"
             label="Add New Cycle"
             icon={PlusIcon}
-            disabled={useLocalSource}
           />
+       
         </div>
       </div>
 
@@ -315,13 +276,10 @@ function CycleManager() {
         ) : cyclesToDisplay.length === 0 ? (
           <div className="text-gray-400 text-center mt-2 select-none">
             <span className="block mb-2 text-lg font-semibold">
-              {useLocalSource ? "No local cycles found." : "No cycles found."}
+              {"No local cycles found."}
             </span>
             <span className="text-gray-500">
-              {useLocalSource 
-                ? "Add JSON files to your local directory or set the directory path in the header."
-                : "Press Enter to run a smarter search."
-              }
+              {"Add JSON files to your local directory or set the directory path in the header."}
             </span>
           </div>
         ) : (

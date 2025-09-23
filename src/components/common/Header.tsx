@@ -139,10 +139,6 @@ function Header() {
     }
   };
 
-  // Function to handle WebSocket reconnection
-  const handleReconnect = () => {
-    websocketManager.reconnect();
-  };
 
   // Function to load cycles from local directory
   const loadCyclesFromLocalPath = async (directoryPath?: string) => {
