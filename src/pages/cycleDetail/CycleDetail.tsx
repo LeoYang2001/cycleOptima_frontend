@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Logs, Play, X, Palette, Monitor, Download } from "lucide-react";
 import Note from "../../components/cycleDetail/Note";
 import Section from "../../components/common/Section";
@@ -23,14 +23,19 @@ function CycleDetail() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Get cycle from Redux store
-  const cycle = useSelector((state: RootState) => selectCycleById(state, id!));
+  // Try to get cycle from Redux
+  const cycleFromRedux = useSelector((state: RootState) => selectCycleById(state, id!));
   const cycles = useSelector((state: RootState) => state.cycles.cycles);
   const cyclesLoading = useSelector((state: RootState) => state.cycles.loading);
 
-  // Get WebSocket connection status
-  const wsConnected = useSelector(selectWebSocketConnected);
+  // Try to get cycle from navigation state (for new cycles)
+  const cycleFromState = location.state?.cycle;
+  const isNewCycle = location.state?.isNew;
+
+  // Use cycle from Redux if exists, otherwise use cycle from navigation state
+  const cycle = cycleFromRedux || cycleFromState;
 
   // Set up auto-sync (disabled for manual control)
   const { pendingCount, triggerSync } = useAutoSync({
@@ -53,10 +58,9 @@ function CycleDetail() {
   const [newPhaseName, setNewPhaseName] = useState("");
   const [newPhaseColor, setNewPhaseColor] = useState("4ADE80");
 
-  // Keypad modal state for run authorization
-  const [showKeypadModal, setShowKeypadModal] = useState(false);
-  const [enteredCode, setEnteredCode] = useState("");
-  const [codeError, setCodeError] = useState("");
+
+  // Get WebSocket connection status from Redux
+  const wsConnected = useSelector(selectWebSocketConnected);
 
   // Manual save trigger (for save button) - defined early so useEffect can reference it
   const handleSave = async () => {
@@ -76,16 +80,10 @@ function CycleDetail() {
     }
   };
 
-  // Manual run trigger (for run shortcut) - now opens keypad modal first
+  // Manual run trigger (for run shortcut) - now runs directly
   const handleRun = async () => {
-    if (!cycle) {
-      return; // No cycle to run
-    }
-
-    // Open keypad modal instead of running directly
-    setShowKeypadModal(true);
-    setEnteredCode("");
-    setCodeError("");
+    if (!cycle) return;
+    executeRun();
   };
 
   // Navigate to monitor with cycle data
@@ -116,7 +114,6 @@ function CycleDetail() {
 
       setIsRunning(true);
       setFlashCompleted(false);
-      setShowKeypadModal(false);
 
       // Register message handler for this cycle run
       const handleCycleRunResponse = (data: any) => {
@@ -198,70 +195,6 @@ function CycleDetail() {
       websocketManager.unregisterMessageHandler('cycleRun');
     };
   }, []);
-
-  // Handle keypad input
-  const handleKeypadInput = (digit: string) => {
-    if (enteredCode.length < 4) {
-      setEnteredCode((prev) => prev + digit);
-    }
-  };
-
-  // Handle keypad backspace
-  const handleKeypadBackspace = () => {
-    setEnteredCode((prev) => prev.slice(0, -1));
-  };
-
-  // Handle keypad clear
-  const handleKeypadClear = () => {
-    setEnteredCode("");
-    setCodeError("");
-  };
-
-  // Handle code verification
-  const handleCodeSubmit = () => {
-    if (enteredCode === "0209") {
-      executeRun();
-    } else {
-      setCodeError("Invalid code. Please try again.");
-      setEnteredCode("");
-    }
-  };
-
-  // Close keypad modal
-  const handleCloseKeypadModal = () => {
-    setShowKeypadModal(false);
-    setEnteredCode("");
-    setCodeError("");
-  };
-
-  // Handle keyboard input for the keypad modal
-  useEffect(() => {
-    if (!showKeypadModal) return;
-
-    const handleKeypadKeyDown = (e: KeyboardEvent) => {
-      e.preventDefault();
-
-      if (e.key >= "0" && e.key <= "9") {
-        handleKeypadInput(e.key);
-      } else if (e.key === "Backspace") {
-        handleKeypadBackspace();
-      } else if (e.key === "Enter" && enteredCode.length === 4) {
-        handleCodeSubmit();
-      } else if (e.key === "Escape") {
-        handleCloseKeypadModal();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeypadKeyDown);
-    return () => document.removeEventListener("keydown", handleKeypadKeyDown);
-  }, [
-    showKeypadModal,
-    enteredCode,
-    handleKeypadInput,
-    handleKeypadBackspace,
-    handleCodeSubmit,
-    handleCloseKeypadModal,
-  ]);
 
   // Download cycle data as JSON
   const handleDownload = async () => {
@@ -583,7 +516,7 @@ function CycleDetail() {
             )}
 
             {/* Save Status Indicator */}
-            {isSaving ? (
+            {/* {isSaving ? (
               <div className="flex items-center gap-3 bg-blue-900/20 border border-blue-600/30 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-blue-400 rounded-full animate-spin border border-blue-200"></div>
@@ -611,7 +544,7 @@ function CycleDetail() {
                   All changes saved
                 </span>
               </div>
-            )}
+            )} */}
           </div>
         </div>
         <div className="flex flex-row absolute left-0 top-16">
@@ -828,78 +761,7 @@ function CycleDetail() {
         </div>
       )}
 
-      {/* Keypad Modal for Run Authorization */}
-      {showKeypadModal && (
-        <div
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.8)",
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          onClick={handleCloseKeypadModal}
-        >
-          {/* Modal Content */}
-          <div
-            style={{
-              backgroundColor: "#27272a",
-            }}
-            className="rounded-lg p-6 w-96 max-w-md py-10 mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-center mb-6">
-              <div className="flex items-center gap-2">
-                <Play className="text-red-400" size={20} />
-                <h2 className="text-xl font-semibold text-white">
-                  Authorize Cycle Run
-                </h2>
-              </div>
-            </div>
-
-            {/* Security Message */}
-            <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-600/30 rounded-lg">
-              <p className="text-yellow-300 text-sm text-center">
-                🔒 Demo Security: Type the 4-digit authorization code to run
-                this cycle
-              </p>
-            </div>
-
-            {/* Code Display */}
-            <div className="mb-6">
-              <div className="flex justify-center gap-2 mb-4">
-                {[0, 1, 2, 3].map((index) => (
-                  <div
-                    key={index}
-                    className="w-12 h-12 border-2 border-gray-600 rounded-lg flex items-center justify-center text-white text-xl font-mono bg-gray-800"
-                  >
-                    {enteredCode[index] ? "●" : ""}
-                  </div>
-                ))}
-              </div>
-
-              {/* Error Message */}
-              {codeError && (
-                <p className="text-red-400 text-sm text-center mb-4">
-                  {codeError}
-                </p>
-              )}
-            </div>
-
-            {/* Submit Button */}
-            <div className="flex justify-center">
-              <div
-                onClick={handleCodeSubmit}
-                className="px-8 py-3 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors cursor-pointer"
-              >
-                {enteredCode.length === 4
-                  ? "Run Cycle (Enter)"
-                  : `Enter ${4 - enteredCode.length} more digit${
-                      4 - enteredCode.length === 1 ? "" : "s"
-                    }`}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Render more details here */}
     </div>
   );
 }

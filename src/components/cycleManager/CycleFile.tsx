@@ -59,7 +59,7 @@ function CycleFile({ cycle }: CycleFileProps) {
             <span className="font-semibold text-white text-xl">
               {cycle.displayName}
             </span>
-            <CycleTag ifTested={cycle.status === "tested"} />
+            {/* <CycleTag ifTested={cycle.status === "tested"} /> */}
           </div>
 
           {/* engineer note  */}
@@ -79,13 +79,13 @@ function CycleFile({ cycle }: CycleFileProps) {
             Duration: {formatTimeLabel(totalCycleDuration)}
           </div>
           <div className=" flex  flex-row w-full mt-auto justify-between ">
-            <div
+            {/* <div
               onClick={handleDelete}
               className="cursor-default group-hover:opacity-100 active:text-gray-400 text-gray-500  flex justify-center items-center px-1 opacity-0 transition-opacity duration-300"
             >
               <Trash2 size={18} />
-            </div>
-            <div className="flex flex-row items-center gap-2">
+            </div> */}
+            <div className=" ml-auto flex flex-row items-center gap-2">
               <TimeTag createdAt={cycle.created_at} />
             </div>
           </div>

@@ -17,6 +17,8 @@ interface PhaseBreakdownProps {
 }
 
 function PhaseBreakdown({ Phases, cycle, deletePhase }: PhaseBreakdownProps) {
+
+  console.log('cycle read from phase breakdown', cycle)
   return (
     <div className=" w-full h-full  flex flex-col gap-3    ">
       {Phases.map((phase) => {
