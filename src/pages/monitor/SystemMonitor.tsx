@@ -843,7 +843,7 @@ function SystemMonitor() {
         <div style={{
           background: "#1a1a1a",
           border: "1px solid #333",
-          borderRadius: "12px",
+          borderRadius: "12px", 
           padding: "24px"
         }}>
           <h3 style={{ 
