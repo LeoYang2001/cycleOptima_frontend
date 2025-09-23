@@ -390,19 +390,18 @@ function Header() {
     setNewWsUrl(value);
   };
 
-  // Add this function to handle save
-  const handleSaveWsConfig = () => {
-    // Basic validation for WebSocket URL format
-    const wsUrlPattern = /^ws:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d+\/ws$/;
-    if (!wsUrlPattern.test(newWsUrl)) {
-      alert('Please enter a valid WebSocket URL in the format: ws://xxx.xxx.xxx.xxx:xxxx/ws');
-      return;
-    }
-    
-    dispatch(updateWebSocketUrl(newWsUrl));
-    websocketManager.reconnect();
-    setShowWsConfigModal(false);
-  };
+const handleSaveWsConfig = () => {
+  // Basic validation for WebSocket URL format
+  const wsUrlPattern = /^wss:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\/ws$/;
+  if (!wsUrlPattern.test(newWsUrl)) {
+    alert('Please enter a valid WebSocket URL in the format: wss://xxx.xxx.xxx.xxx/ws or wss://xxx.xxx.xxx.xxx:xxxx/ws');
+    return;
+  }
+  
+  dispatch(updateWebSocketUrl(newWsUrl));
+  websocketManager.reconnect();
+  setShowWsConfigModal(false);
+};
 
   return (
     <div
@@ -636,27 +635,26 @@ function Header() {
                   {wsUrl}
                 </div>
               </div>
-
-              {/* WebSocket URL Input */}
-              <div className="space-y-3">
-                <label className="block text-gray-400 text-sm font-medium">
-                  New WebSocket URL
-                </label>
-                <input
-                  type="text"
-                  value={newWsUrl}
-                  onChange={(e) => handleWsUrlChange(e.target.value)}
-                  placeholder="ws://xxx.xxx.xxx.xxx:xxxx/ws"
-                  className="w-full h-12 px-4 bg-gray-800 border border-gray-700 rounded-lg
-                           text-gray-100 font-mono text-lg
-                           focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
-                           transition-colors"
-                  autoFocus
-                />
-                <div className="text-gray-500 text-xs">
-                  Format: ws://xxx.xxx.xxx.xxx:xxxx/ws (Example: ws://192.168.4.193:8080/ws)
-                </div>
-              </div>
+{/* WebSocket URL Input */}
+<div className="space-y-3">
+  <label className="block text-gray-400 text-sm font-medium">
+    New WebSocket URL
+  </label>
+  <input
+    type="text"
+    value={newWsUrl}
+    onChange={(e) => handleWsUrlChange(e.target.value)}
+    placeholder="wss://xxx.xxx.xxx.xxx/ws"
+    className="w-full h-12 px-4 bg-gray-800 border border-gray-700 rounded-lg
+             text-gray-100 font-mono text-lg
+             focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+             transition-colors"
+    autoFocus
+  />
+  <div className="text-gray-500 text-xs">
+    Format: wss://xxx.xxx.xxx.xxx/ws (Example: wss://192.168.4.137/ws)
+  </div>
+</div>
             </div>
 
             {/* Footer */}
