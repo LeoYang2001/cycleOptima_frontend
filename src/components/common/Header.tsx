@@ -448,7 +448,7 @@ const handleSaveWsConfig = () => {
         }
         className="flex items-center gap-3 transition-all duration-800"
       >
-         <button
+         {/* <button
         onClick={() => {
           // Get all cycles from Redux
           console.log(localCycles)
@@ -469,7 +469,7 @@ const handleSaveWsConfig = () => {
         }}
       >
         Debug: Log All Cycles
-      </button>
+      </button> */}
         {/* WebSocket Connection Status */}
         <div
           className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
