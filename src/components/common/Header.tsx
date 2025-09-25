@@ -59,9 +59,7 @@ function Header() {
   const [newWsUrl, setNewWsUrl] = useState(wsUrl);
 
   // Get state from Redux
-  const localCycles = useSelector(selectLocalCycles);
-  const loadingCycles = useSelector(selectLocalCyclesLoading);
-  const savedDirectoryPath = useSelector(selectLocalCyclesDirectoryPath);
+  const localCycles = useSelector((state: RootState) => state.localCycles.cycles);
   
 
   // Load saved path from localStorage and Redux
@@ -450,6 +448,28 @@ const handleSaveWsConfig = () => {
         }
         className="flex items-center gap-3 transition-all duration-800"
       >
+         <button
+        onClick={() => {
+          // Get all cycles from Redux
+          console.log(localCycles)
+        }}
+        style={{
+          position: "fixed",
+          bottom: 20,
+          right: 20,
+          zIndex: 9999, 
+          background: "#222",
+          color: "#fff",
+          padding: "10px 18px",
+          borderRadius: 8,
+          border: "1px solid #444",
+          fontSize: 14,
+          cursor: "pointer",
+          opacity: 0.8,
+        }}
+      >
+        Debug: Log All Cycles
+      </button>
         {/* WebSocket Connection Status */}
         <div
           className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
@@ -675,6 +695,8 @@ const handleSaveWsConfig = () => {
           </div>
         </div>
       )}
+
+     
     </div>
   );
 }

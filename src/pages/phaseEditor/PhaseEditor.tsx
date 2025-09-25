@@ -58,8 +58,10 @@ function PhaseEditor() {
   }
 
   const cycle = useSelector((state: RootState) =>
-    selectCycleById(state, cycleId!)
+    state.localCycles.cycles.find((cycle) => cycle.id === cycleId)
   );
+
+
   const cycles = useSelector((state: RootState) => state.cycles.cycles);
   const cyclesLoading = useSelector((state: RootState) => state.cycles.loading);
   const phase = cycle?.data.phases.find((p) => p.id === phaseId);

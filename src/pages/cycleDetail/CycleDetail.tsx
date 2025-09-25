@@ -10,7 +10,6 @@ import PhaseBreakdown from "../../components/cycleDetail/PhaseBreakdown";
 import CycleSummary from "../../components/cycleDetail/CycleSummary";
 import { useAutoSync } from "../../hooks/useAutoSync";
 import {
-  selectCycleById,
   updateCycleOptimistically,
   updateCyclePhases,
   updateCycleNote,
@@ -25,18 +24,11 @@ function CycleDetail() {
   const navigate = useNavigate();
   const location = useLocation();
 
+
   // Try to get cycle from Redux
-  const cycleFromRedux = useSelector((state: RootState) => selectCycleById(state, id!));
+  const cycle = useSelector((state: RootState) => state.localCycles.cycles).find(cycle => cycle.id === id)
   const cycles = useSelector((state: RootState) => state.cycles.cycles);
   const cyclesLoading = useSelector((state: RootState) => state.cycles.loading);
-
-  // Try to get cycle from navigation state (for new cycles)
-  const cycleFromState = location.state?.cycle;
-  const isNewCycle = location.state?.isNew;
-
-  // Use cycle from Redux if exists, otherwise use cycle from navigation state
-  const cycle = cycleFromRedux || cycleFromState;
-
   // Set up auto-sync (disabled for manual control)
   const { pendingCount, triggerSync } = useAutoSync({
     enabled: false, // Disable auto-sync for manual control
@@ -58,6 +50,8 @@ function CycleDetail() {
   const [newPhaseName, setNewPhaseName] = useState("");
   const [newPhaseColor, setNewPhaseColor] = useState("4ADE80");
 
+  
+const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Get WebSocket connection status from Redux
   const wsConnected = useSelector(selectWebSocketConnected);
@@ -99,96 +93,85 @@ function CycleDetail() {
     });
   };
 
-  // Actual run function after code verification
-  const executeRun = async () => {
-    console.log('executing run...', cycle);
-    try {
-      if (!cycle) {
-        return; // No cycle to run
-      }
+const executeRun = async () => {
+  console.log('executing run...', cycle);
+  try {
+    if (!cycle) return;
+    if (!wsConnected) {
+      alert('Not connected to system. Please check your connection and try again.');
+      return;
+    }
 
-      if (!wsConnected) {
-        alert('Not connected to system. Please check your connection and try again.');
-        return;
-      }
+    setIsRunning(true);
+    setFlashCompleted(false);
 
-      setIsRunning(true);
-      setFlashCompleted(false);
+    const handleCycleRunResponse = (data: any) => {
+      console.log('Cycle run WebSocket message received:', data);
 
-      // Register message handler for this cycle run
-      const handleCycleRunResponse = (data: any) => {
-        console.log('Cycle run WebSocket message received:', data);
-        
-        if (data.success) {
-          console.log('Cycle run successful:', data);
-          setIsRunning(false);
-          setFlashCompleted(true);
-          
-          // Show success message briefly, then navigate to monitor
-          setTimeout(() => {
-            console.log('Navigating to monitor page with cycle data');
-            navigate("/system-monitor", {
-              state: {
-                cycleData: cycle,
-                timestamp: Date.now(),
-                autoStarted: true,
-                flashSuccess: true
-              },
-            });
-            
-            // Unregister handler
-            websocketManager.unregisterMessageHandler('cycleRun');
-          }, 1500);
-          
-        } else if (!data.success) {
-          console.error('Cycle run failed:', data);
-          setIsRunning(false);
-          setFlashCompleted(false);
-          alert(`Failed to run cycle: ${data.message || data.error || 'Unknown error'}`);
-          
-          // Unregister handler
+      if (data.success) {
+        console.log('Cycle run successful:', data);
+        setIsRunning(false);
+        setFlashCompleted(true);
+
+        setIsRedirecting(true); // <-- Set redirecting state
+
+        setTimeout(() => {
+          console.log('Navigating to monitor page with cycle data');
+          navigate("/system-monitor", {
+            state: {
+              cycleData: cycle,
+              timestamp: Date.now(),
+              autoStarted: true,
+              flashSuccess: true
+            },
+          });
+
+          setIsRedirecting(false); // <-- Reset after navigation (optional, in case you come back)
           websocketManager.unregisterMessageHandler('cycleRun');
-        } else if (data.type === 'cycle-run-progress' || data.action === 'cycle-run-progress') {
-          console.log('Cycle run progress:', data);
-        }
-      };
+        }, 1500);
 
-      // Register the message handler
-      websocketManager.registerMessageHandler('cycleRun', handleCycleRunResponse);
-
-      // Send cycle run command
-      const success = websocketManager.send({
-        action: 'write_json',
-        data: cycle.data,
-      });
-
-      if (!success) {
+      } else if (!data.success) {
+        console.error('Cycle run failed:', data);
         setIsRunning(false);
         setFlashCompleted(false);
         websocketManager.unregisterMessageHandler('cycleRun');
-        alert('Failed to send command. WebSocket not connected.');
+      } else if (data.type === 'cycle-run-progress' || data.action === 'cycle-run-progress') {
+        console.log('Cycle run progress:', data);
       }
+    };
 
-      // Set a timeout for the operation (30 seconds)
-      setTimeout(() => {
-        if (isRunning) {
-          console.warn('Cycle run timeout');
-          setIsRunning(false);
-          setFlashCompleted(false);
-          websocketManager.unregisterMessageHandler('cycleRun');
-          alert('Cycle run timed out. Please try again.');
-        }
-      }, 30000);
+    websocketManager.registerMessageHandler('cycleRun', handleCycleRunResponse);
 
-    } catch (error) {
-      console.error("Run failed:", error);
+    const success = websocketManager.send({
+      action: 'write_json',
+      data: cycle.data,
+    });
+
+    if (!success) {
       setIsRunning(false);
       setFlashCompleted(false);
       websocketManager.unregisterMessageHandler('cycleRun');
-      alert(`Failed to run cycle: ${(error as Error).message}`);
+      alert('Failed to send command. WebSocket not connected.');
     }
-  };
 
+    setTimeout(() => {
+      if (isRunning) {
+        console.warn('Cycle run timeout');
+        setIsRunning(false);
+        setFlashCompleted(false);
+        websocketManager.unregisterMessageHandler('cycleRun');
+        alert('Cycle run timed out. Please try again.');
+      }
+    }, 30000);
+
+  } catch (error) {
+    console.error("Run failed:", error);
+    setIsRunning(false);
+    setFlashCompleted(false);
+    websocketManager.unregisterMessageHandler('cycleRun');
+    alert(`Failed to run cycle: ${(error as Error).message}`);
+  }
+};
   // Cleanup message handler when component unmounts
   useEffect(() => {
     return () => {
@@ -478,7 +461,36 @@ function CycleDetail() {
             )}
 
             {/* Run/Monitor Status Indicator */}
-            {isRunning ? (
+            {isRedirecting ? (
+              <div className="flex items-center gap-3 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2">
+                  {/* Spinner Animation */}
+                  <svg
+                    className="animate-spin h-5 w-5 text-green-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    ></path>
+                  </svg>
+                  <span className="text-green-300 text-sm font-medium">
+                    Redirecting to monitor...
+                  </span>
+                </div>
+              </div>
+            ) : isRunning ? (
               <div className="flex items-center gap-3 bg-purple-900/20 border border-purple-600/30 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <Play className="w-3 h-3 text-purple-400 animate-pulse" />
