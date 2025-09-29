@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useSelector } from 'react-redux';
 import SensorDataPresentation from "../../components/monitor/sensorDataPresentation";
+import LiveSensorCard from "../../components/monitor/LiveSensorCard";
 import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
 import { set } from "zod";
 
@@ -231,6 +232,8 @@ function SystemMonitor() {
   useEffect(() => {
     const handleSystemMessage = (data: any) => {
       try {
+          console.log('Telemetry data before:', data.sensors);
+
         // Handle telemetry data response
         if (data.cycle_running !== undefined) {
           console.log('Telemetry data received:', data);
@@ -534,163 +537,11 @@ function SystemMonitor() {
           </div>
         </div>
 
-        {/* Live Sensor Data Card - Make it clickable */}
-        <div 
-          style={{
-            background: "#1a1a1a",
-            border: "1px solid #333",
-            borderRadius: "12px",
-            padding: "24px",
-            cursor: "pointer",
-            transition: "all 0.2s ease"
-          }}
-          onClick={() => setShowSensorModal(true)}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#252525";
-            e.currentTarget.style.borderColor = "#444";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "#1a1a1a";
-            e.currentTarget.style.borderColor = "#333";
-          }}
-        >
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "20px"
-          }}>
-            <h3 style={{ 
-              margin: "0", 
-              fontSize: "18px", 
-              fontWeight: "600" 
-            }}>
-              Live Sensor Data
-            </h3>
-            <div style={{
-              padding: "4px 8px",
-              background: "#3b82f6",
-              borderRadius: "12px",
-              fontSize: "10px",
-              fontWeight: "600",
-              textTransform: "uppercase"
-            }}>
-              Click for Analytics
-            </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center" 
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <div style={{ 
-                  width: "32px", 
-                  height: "32px", 
-                  borderRadius: "6px", 
-                  background: "#3b82f6",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "14px",
-                  fontWeight: "600"
-                }}>
-                  P
-                </div>
-                <span style={{ fontSize: "14px" }}>Pressure</span>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "20px", fontWeight: "700" }}>2.2</div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>bar</div>
-              </div>
-            </div>
-
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center" 
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <div style={{ 
-                  width: "32px", 
-                  height: "32px", 
-                  borderRadius: "6px", 
-                  background: "#10b981",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "14px",
-                  fontWeight: "600"
-                }}>
-                  R
-                </div>
-                <span style={{ fontSize: "14px" }}>Flow Rate</span>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "20px", fontWeight: "700" }}>
-                  {telemetryData?.sensors.flow_sensor_pin3.toFixed(1) || "0.0"}
-                </div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>pulses/sec</div>
-              </div>
-            </div>
-
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center" 
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <div style={{ 
-                  width: "32px", 
-                  height: "32px", 
-                  borderRadius: "6px", 
-                  background: "#ef4444",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "14px",
-                  fontWeight: "600"
-                }}>
-                  T
-                </div>
-                <span style={{ fontSize: "14px" }}>Temperature</span>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "20px", fontWeight: "700" }}>39.7</div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>°C</div>
-              </div>
-            </div>
-
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center" 
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <div style={{ 
-                  width: "32px", 
-                  height: "32px", 
-                  borderRadius: "6px", 
-                  background: "#06b6d4",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "14px",
-                  fontWeight: "600"
-                }}>
-                  W
-                </div>
-                <span style={{ fontSize: "14px" }}>Water Level</span>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "20px", fontWeight: "700" }}>74.5</div>
-                <div style={{ fontSize: "12px", color: "#64748b" }}>%</div>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Live Sensor Data Card - Now using the component */}
+        <LiveSensorCard 
+          telemetryData={telemetryData}
+          onCardClick={() => setShowSensorModal(true)}
+        />
       </div>
 
       {/* Second Row */}

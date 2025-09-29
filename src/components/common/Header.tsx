@@ -386,8 +386,9 @@ function Header() {
 
 const handleSaveWsConfig = () => {
   // Basic validation for WebSocket URL format
-  const wsUrlPattern = /^wss:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\/ws$/;
-  if (!wsUrlPattern.test(newWsUrl)) {
+  const wsUrlPattern = /^wss:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\/ws$/ ;
+  const wsUrlPatternDev = /^ws:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\/ws$/;
+  if (!wsUrlPattern.test(newWsUrl) && !wsUrlPatternDev.test(newWsUrl)) {
     alert('Please enter a valid WebSocket URL in the format: wss://xxx.xxx.xxx.xxx/ws or wss://xxx.xxx.xxx.xxx:xxxx/ws');
     return;
   }
