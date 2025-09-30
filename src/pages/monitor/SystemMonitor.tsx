@@ -5,6 +5,7 @@ import SensorDataPresentation from "../../components/monitor/sensorDataPresentat
 import LiveSensorCard from "../../components/monitor/LiveSensorCard";
 import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
 import { set } from "zod";
+import { Gauge } from "lucide-react"; // Add at the top for the RPM icon
 
 const pins = [
   { name: "RETRACTOR_PIN", pin: 7 },
@@ -77,6 +78,7 @@ function SystemMonitor() {
   
   // Get cycle data from navigation state
   const cycleData: CycleData | null = location.state?.cycleData || null;
+
   const timestamp = location.state?.timestamp || null;
 
   const [pinStates, setPinStates] = useState<Record<number, boolean>>({});
@@ -103,6 +105,7 @@ function SystemMonitor() {
       }, 0);
       
       return {
+        id: phase.id, // Add id property
         name: phase.name,
         color: `#${phase.color}`,
         duration: phaseDuration,
@@ -232,11 +235,9 @@ function SystemMonitor() {
   useEffect(() => {
     const handleSystemMessage = (data: any) => {
       try {
-          console.log('Telemetry data before:', data.sensors);
 
         // Handle telemetry data response
         if (data.cycle_running !== undefined) {
-          console.log('Telemetry data received:', data);
           setTelemetryData(data);
           
           // Update pin states from components array
@@ -433,40 +434,65 @@ function SystemMonitor() {
             <div style={{ fontSize: "14px", color: "#94a3b8", marginBottom: "12px" }}>
               Phase Timeline {cycleData && `(${cycleData.data.name})`}
             </div>
-            <div style={{ display: "flex", height: "40px", borderRadius: "6px",  }}>
+            <div style={{ display: "flex", height: "40px", borderRadius: "6px" }}>
               {phaseTimeline.length > 0 ? (
-                phaseTimeline.map((phase, index) => (
-                  <div 
-                    key={phase.name}
-                    style={{ 
-                      background: phase.color, 
-                      flex: "1", 
-                      display: "flex", 
-                      alignItems: "center", 
-                      justifyContent: "center",
-                      fontSize: "12px",
-                      fontWeight: "600",
-                      position: "relative",
-                      opacity: telemetryData?.current_phase === phase.index ? 1 : 0.7,
-                      border: telemetryData?.current_phase === phase.index ? "2px solid #fff" : "none"
-                    }}
-                  >
-                    {phase.name}
-                    {telemetryData?.current_phase === phase.index && (
-                      <div style={{
-                        position: "absolute",
-                        top: "-8px",
-                        right: "-8px",
-                        width: "16px",
-                        height: "16px",
-                        background: "#22c55e",
-                        borderRadius: "50%",
-                        border: "2px solid #fff",
-                        animation: "pulse 2s infinite"
-                      }}></div>
-                    )}
-                  </div>
-                ))
+                phaseTimeline.map((phase, index) => {
+                  // Find the full phase object from cycleData to check for sensorTrigger
+                  const fullPhase = cycleData?.data.phases?.find(p => p.id === phase.id || p.name === phase.name);
+
+                  return (
+                    <div 
+                      key={phase.name}
+                      style={{ 
+                        background: phase.color, 
+                        flex: "1", 
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center",
+                        fontSize: "12px",
+                        fontWeight: "600",
+                        position: "relative",
+                        opacity: telemetryData?.current_phase === phase.index ? 1 : 0.7,
+                        border: telemetryData?.current_phase === phase.index ? "2px solid #fff" : "none"
+                      }}
+                    >
+                      <span>{phase.name}</span>
+                      {/* Sensor Trigger Indicator */}
+                      {fullPhase?.sensorTrigger && (
+                        <span
+                          title={`Sensor Trigger: ${fullPhase.sensorTrigger.type} ≥ ${fullPhase.sensorTrigger.threshold} (Pin ${fullPhase.sensorTrigger.pinNumber})`}
+                          style={{
+                            position: "absolute",
+                            top: "4px",
+                            right: "4px",
+                            background: "#10b981",
+                            borderRadius: "50%",
+                            padding: "2px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 0 4px #10b981",
+                          }}
+                        >
+                          <Gauge size={14} color="#fff" />
+                        </span>
+                      )}
+                      {telemetryData?.current_phase === phase.index && (
+                        <div style={{
+                          position: "absolute",
+                          top: "-8px",
+                          right: "-8px",
+                          width: "16px",
+                          height: "16px",
+                          background: "#22c55e",
+                          borderRadius: "50%",
+                          border: "2px solid #fff",
+                          animation: "pulse 2s infinite"
+                        }}></div>
+                      )}
+                    </div>
+                  );
+                })
               ) : (
                 // Default phases when no cycle data
                 <>

@@ -5,6 +5,7 @@ import storage from 'redux-persist/lib/storage'; // defaults to localStorage for
 
 // Import the existing Cycle type
 import type { Cycle } from '../types/common/Cycle';
+import type { Phase } from '../types/common/Phase';
 
 interface LocalCyclesState {
   cycles: Cycle[];
@@ -26,6 +27,70 @@ const localCyclesSlice = createSlice({
   name: 'localCycles',
   initialState,
   reducers: {
+
+        deletePhaseOptimistically: (
+      state,
+      action: PayloadAction<{ cycleId: string; phaseId: string }>
+    ) => {
+      const { cycleId, phaseId } = action.payload;
+      const cycle = state.cycles.find((c) => c.id === cycleId);
+ if (cycle) {
+        cycle.data.phases = cycle.data.phases.filter(
+          (phase) => phase.id !== phaseId
+        );
+    
+      }
+    
+    },
+
+
+       updateCyclePhases: (
+      state,
+      action: PayloadAction<{ cycleId: string; phases: Phase[] }>
+    ) => {
+      const { cycleId, phases } = action.payload;
+      const cycle = state.cycles.find((c) => c.id === cycleId);
+
+      if (cycle) {
+        cycle.data.phases = phases;
+       
+      }
+    },
+       addPhaseOptimistically: (
+          state,
+          action: PayloadAction<{ cycleId: string; phase: Phase }>
+        ) => {
+          const { cycleId, phase } = action.payload;
+          const cycle = state.cycles.find((c) => c.id === cycleId);
+     if (cycle) {
+        cycle.data.phases.push(phase);
+     }
+        
+        },
+     updateCycleOptimistically: (state, action: PayloadAction<Cycle>) => {
+   
+      const updatedCycle = action.payload;
+      const index = state.cycles.findIndex(
+        (cycle) => cycle.id === updatedCycle.id
+      );
+
+      if (index !== -1) {
+        state.cycles[index] = updatedCycle;
+      } else {
+        state.cycles.push(updatedCycle);
+        console.log('push new cycle in local:', updatedCycle);
+      }
+
+    },
+     updateCycleNote: (
+      state,
+      action: PayloadAction<{ cycleId: string; note: string }>
+    ) => {
+      const { cycleId, note } = action.payload;
+      const cycle = state.cycles.find((c) => c.id === cycleId);
+
+     
+    },
     // Set loading state
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
@@ -125,6 +190,11 @@ export const {
   updateCycle,
   removeCycle,
   clearCycles,
+  updateCycleOptimistically,
+  updateCycleNote,
+  addPhaseOptimistically,
+  deletePhaseOptimistically,
+  updateCyclePhases
 } = localCyclesSlice.actions;
 
 // Selectors

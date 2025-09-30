@@ -14,9 +14,9 @@ import {
   selectLocalCycles, 
   selectLocalCyclesLoading, 
   selectLocalCyclesDirectoryPath,
+  updateCycleOptimistically,
 } from "../../store/localCyclesSlice";
 import { useNavigate } from "react-router-dom";
-import { updateCycleOptimistically } from "../../store/cycleSlice"; // Add this import at the top
 import type { Cycle } from "../../types/common/Cycle";
 
 const statusOptions = ["all status", "draft", "tested"];

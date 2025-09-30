@@ -3,13 +3,11 @@ import { useSelector, useDispatch } from "react-redux";
 import { useParams, useNavigate } from "react-router-dom";
 import type { RootState, AppDispatch } from "../../store";
 import {
-  selectCycleById,
   updateCycleOptimistically,
-} from "../../store/cycleSlice";
+} from "../../store/localCyclesSlice";
 import { useAutoSync } from "../../hooks/useAutoSync";
 import Section from "../../components/common/Section";
 import PhaseConfiguration from "../../components/phaseEditor/PhaseConfiguration";
-import { Save, ArrowLeft, X } from "lucide-react";
 import ComponentTimeline from "../../components/phaseEditor/ComponentTimeline";
 import ComponentLibrary from "../../components/phaseEditor/ComponentLibrary";
 import {

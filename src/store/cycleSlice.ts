@@ -45,6 +45,7 @@ const cycleSlice = createSlice({
   reducers: {
     // Optimistic updates - immediately update Redux state
     updateCycleOptimistically: (state, action: PayloadAction<Cycle>) => {
+   
       const updatedCycle = action.payload;
       const index = state.cycles.findIndex(
         (cycle) => cycle.id === updatedCycle.id
@@ -54,6 +55,7 @@ const cycleSlice = createSlice({
         state.cycles[index] = updatedCycle;
       } else {
         state.cycles.push(updatedCycle);
+        console.log('push new cycle:', updatedCycle);
       }
 
       // Increment change count

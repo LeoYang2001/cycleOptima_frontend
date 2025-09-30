@@ -9,26 +9,22 @@ import CycleTimeLinePreview from "../../components/common/CycleTimeLinePreview";
 import PhaseBreakdown from "../../components/cycleDetail/PhaseBreakdown";
 import CycleSummary from "../../components/cycleDetail/CycleSummary";
 import { useAutoSync } from "../../hooks/useAutoSync";
-import {
-  updateCycleOptimistically,
-  updateCyclePhases,
-  updateCycleNote,
-  addPhaseOptimistically,
-  deletePhaseOptimistically,
-} from "../../store/cycleSlice";
+
 import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
+import { addPhaseOptimistically, deletePhaseOptimistically, updateCycleNote, updateCycleOptimistically, updateCyclePhases } from "../../store/localCyclesSlice";
 
 function CycleDetail() {
   const { id } = useParams<{ id: string }>();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const location = useLocation();
+ 
 
 
   // Try to get cycle from Redux
-  const cycle = useSelector((state: RootState) => state.localCycles.cycles).find(cycle => cycle.id === id)
-  const cycles = useSelector((state: RootState) => state.cycles.cycles);
-  const cyclesLoading = useSelector((state: RootState) => state.cycles.loading);
+  const cycles = useSelector((state: RootState) => state.localCycles.cycles);
+
+  const cycle = cycles.find(cycle => cycle.id === id);
+  const cyclesLoading = useSelector((state: RootState) => state.localCycles.loading);
   // Set up auto-sync (disabled for manual control)
   const { pendingCount, triggerSync } = useAutoSync({
     enabled: false, // Disable auto-sync for manual control
@@ -289,10 +285,10 @@ const executeRun = async () => {
 
   // Check if cycle exists and redirect to home if not found (after cycles are loaded)
   useEffect(() => {
-    if (!cyclesLoading && cycles.length > 0 && !cycle && id) {
-      console.log(`Cycle with ID ${id} not found, redirecting to home`);
-      navigate("/", { replace: true });
-    }
+    // if (!cyclesLoading && cycles.length > 0 && !cycle && id) {
+    //   console.log(`Cycle with ID ${id} not found, redirecting to home`);
+    //   navigate("/", { replace: true });
+    // }
   }, [cycle, cycles, cyclesLoading, id, navigate]);
 
 
@@ -316,6 +312,7 @@ const executeRun = async () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-500">Cycle not found, redirecting...</div>
+        <div>{JSON.stringify(cycles.length)}</div>
       </div>
     );
   }
