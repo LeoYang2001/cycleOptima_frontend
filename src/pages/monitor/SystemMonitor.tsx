@@ -32,6 +32,7 @@ interface TelemetryData {
   }>;
   sensors: {
     flow_sensor_pin3: number;
+    pressure_sensor_pin0?: number; // <-- Add this line
   };
   timestamp: number;
 }

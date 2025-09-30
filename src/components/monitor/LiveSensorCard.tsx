@@ -3,6 +3,7 @@ import React from 'react';
 interface TelemetryData {
   cycle_running: boolean;
   current_phase: number;
+
   total_phases: number;
   current_phase_name: string;
   elapsed_seconds: number;
@@ -13,6 +14,7 @@ interface TelemetryData {
   }>;
   sensors: {
     flow_sensor_pin3: number;
+    pressure_sensor_pin0?: number; // Optional, for backward compatibility
   };
   timestamp: number;
 }
@@ -33,9 +35,10 @@ const LiveSensorCard: React.FC<LiveSensorCardProps> = ({ telemetryData, onCardCl
 
   // Get realistic pressure value (0-5 bar range)
   const getPressureValue = () => {
-    const baseValue = 2.2;
-    const variation = Math.sin(Date.now() / 5000) * 0.8; // ±0.8 bar variation
-    return (baseValue + variation).toFixed(1);
+    // Use telemetryData.sensors.pressure_sensor_pin0 if available, otherwise fallback to simulated value
+    const pressure =
+      telemetryData?.sensors?.pressure_sensor_pin0 !== 0
+    return Number(pressure).toFixed(1);
   };
 
   // Get realistic temperature value (35-45°C range)

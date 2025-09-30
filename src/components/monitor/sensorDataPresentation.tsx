@@ -12,6 +12,7 @@ interface SensorDataPoint {
 interface TelemetryData {
   sensors: {
     flow_sensor_pin3: number;
+    pressure_sensor_pin0?: number; // <-- Add this line
   };
   timestamp: number;
 }
@@ -28,22 +29,24 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
   telemetryData
 }) => {
   const [sensorHistory, setSensorHistory] = useState<SensorDataPoint[]>([]);
-  const [selectedSensor, setSelectedSensor] = useState<'all' | 'rpm' | 'pressure' | 'temperature' | 'water'>('all');
+  const [selectedSensor, setSelectedSensor] = useState<'rpm' | 'pressure' | 'temperature' | 'water'>('rpm');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maxDataPoints = 50; // Keep last 50 data points
 
   // Add new data point when telemetry updates
   useEffect(() => {
     if (telemetryData && isOpen) {
-      // Scale the raw sensor value to 0-800 RPM range
       const rawRPM = telemetryData.sensors.flow_sensor_pin3;
-      
+      const rawPressure = telemetryData.sensors.pressure_sensor_pin0;
+
       const newDataPoint: SensorDataPoint = {
         timestamp: Date.now(),
-        rpm: rawRPM, // Use the raw value
-        pressure: 2.2 + Math.sin(Date.now() / 5000) * 0.5, // Mock pressure data
-        temperature: 39.7 + Math.sin(Date.now() / 8000) * 2, // Mock temperature data
-        waterLevel: 74.5 + Math.cos(Date.now() / 6000) * 10, // Mock water level data
+        rpm: rawRPM,
+        pressure: rawPressure !== undefined
+          ? rawPressure
+          : 0, 
+        temperature: 39.7 + Math.sin(Date.now() / 8000) * 2,
+        waterLevel: 74.5 + Math.cos(Date.now() / 6000) * 10,
       };
 
       setSensorHistory(prev => {
@@ -110,8 +113,8 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
       pressure: { 
         color: '#3b82f6', 
         data: sensorHistory.map(d => d.pressure),
-        min: 0,
-        max: 5
+        min: 27000,
+        max: 32000
       },
       temperature: { 
         color: '#ef4444', 
@@ -129,25 +132,14 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
 
     // Update the Y-axis labels to be dynamic based on selected sensor:
     const getYAxisLabels = () => {
-      if (selectedSensor === 'all') {
-        // Find the largest range among all sensors for proper scaling
-        const allRanges = Object.values(sensors).map(sensor => sensor.max - sensor.min);
-        const maxRange = Math.max(...allRanges);
-        const maxValue = Math.max(...Object.values(sensors).map(sensor => sensor.max));
-        
-        // Use the maximum value across all sensors for the scale
-        const step = maxValue / 5;
-        return Array.from({length: 6}, (_, i) => 
-          Math.round(maxValue - (i * step))
-        );
-      } else {
+     
         const sensor = sensors[selectedSensor];
         const range = sensor.max - sensor.min;
         const step = range / 5;
         return Array.from({length: 6}, (_, i) => 
           Math.round(sensor.max - (i * step))
         );
-      }
+      
     };
 
     // Horizontal grid lines
@@ -188,7 +180,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
     // Draw sensor lines
     const drawSensorLine = (sensorKey: keyof typeof sensors) => {
       const sensor = sensors[sensorKey];
-      if (selectedSensor !== 'all' && selectedSensor !== sensorKey) return;
+      if ( selectedSensor !== sensorKey) return;
 
       ctx.strokeStyle = sensor.color;
       ctx.lineWidth = 2;
@@ -196,14 +188,10 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
 
       // Get the normalization range
       let maxValue, minValue;
-      if (selectedSensor === 'all') {
-        // Use global max/min for all sensors when showing all
-        maxValue = Math.max(...Object.values(sensors).map(s => s.max));
-        minValue = 0; // Use 0 as global minimum for consistency
-      } else {
+ 
         maxValue = sensor.max;
         minValue = sensor.min;
-      }
+      
 
       sensor.data.forEach((value, index) => {
         const x = padding.left + (index / (sensor.data.length - 1)) * graphWidth;
@@ -232,12 +220,8 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
       });
     };
 
-    // Draw all selected sensors
-    if (selectedSensor === 'all') {
-      Object.keys(sensors).forEach(key => drawSensorLine(key as keyof typeof sensors));
-    } else {
+   
       drawSensorLine(selectedSensor);
-    }
 
     // Draw labels
     ctx.fillStyle = '#94a3b8';
@@ -248,7 +232,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
     ctx.save();
     ctx.translate(15, height / 2);
     ctx.rotate(-Math.PI / 2);
-    const yAxisLabel = selectedSensor === 'all' ? 'Sensor Values' : 
+    const yAxisLabel = 
                        selectedSensor === 'rpm' ? 'RPM' :
                        selectedSensor === 'pressure' ? 'Pressure (bar)' :
                        selectedSensor === 'temperature' ? 'Temperature (°C)' :
@@ -353,7 +337,6 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <span style={{ fontSize: '14px', color: '#94a3b8' }}>Show:</span>
             {[
-              { key: 'all', label: 'All Sensors', icon: null },
               { key: 'rpm', label: 'RPM', icon: Droplets }, // Changed from flow/Flow Rate to rpm/RPM
               { key: 'pressure', label: 'Pressure', icon: Gauge },
               { key: 'temperature', label: 'Temperature', icon: Thermometer },
