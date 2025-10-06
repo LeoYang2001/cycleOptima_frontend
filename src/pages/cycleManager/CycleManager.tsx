@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PlaceholdersAndVanishInput } from "../../components/ui/placeholders-and-vanish-input";
 import Button from "../../components/common/Button";
-import { PlusIcon, FolderOpen, RotateCcw } from "lucide-react";
+import { PlusIcon, RotateCcw } from "lucide-react";
 import Dropdown from "../../components/common/Dropdown";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
@@ -10,14 +10,16 @@ import { getSemanticSearchResults } from "../../utils/semanticSearch";
 import { X } from "lucide-react";
 import { PuffLoader } from "react-spinners";
 import CycleFile from "../../components/cycleManager/CycleFile";
-import { 
-  selectLocalCycles, 
-  selectLocalCyclesLoading, 
-  selectLocalCyclesDirectoryPath,
-  updateCycleOptimistically,
-} from "../../store/localCyclesSlice";
 import { useNavigate } from "react-router-dom";
 import type { Cycle } from "../../types/common/Cycle";
+import {
+  fetchAllCycles,
+  createCycle,
+  selectAllCycles,
+  selectCyclesLoading,
+  selectCyclesError,
+  clearError
+} from "../../store/cycleSlice";
 
 const statusOptions = ["all status", "draft", "tested"];
 const CYCLES_PER_PAGE = 30; // 6 cols * 5 rows
@@ -30,27 +32,31 @@ function CycleManager() {
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [searchPrompt, setSearchPrompt] = useState("");
-  const [isAddingCycle, setIsAddingCycle] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCycleName, setNewCycleName] = useState("");
 
-  const navigate = useNavigate()
-
-  // Redux selectors for local cycles only
-  const localCycles = useSelector(selectLocalCycles);
-  const localCyclesLoading = useSelector(selectLocalCyclesLoading);
-  const localDirectoryPath = useSelector(selectLocalCyclesDirectoryPath);
-
+  const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
 
-  // Get active cycles from local only
-  const activeCycles = localCycles;
-  const isLoading = localCyclesLoading;
+  // Redux selectors
+  const cycles = useSelector(selectAllCycles);
+  const isLoading = useSelector(selectCyclesLoading);
+  const error = useSelector(selectCyclesError);
 
-  // Refresh cycles from local folder
-  const handleRefreshCycles = () => {
-    window.dispatchEvent(new CustomEvent('refreshLocalCycles'));
-  };
+  // Fetch cycles on component mount
+  useEffect(() => {
+    console.log('Fetching cycles from Redux...');
+    dispatch(fetchAllCycles());
+  }, [dispatch]);
+
+  // Clear error when component unmounts
+  useEffect(() => {
+    return () => {
+      if (error) {
+        dispatch(clearError());
+      }
+    };
+  }, [error, dispatch]);
 
   // Handler for opening add new cycle modal
   const handleAddNewCycle = () => {
@@ -65,7 +71,7 @@ function CycleManager() {
 
     // Check for duplicate cycle names
     const trimmedName = newCycleName.trim();
-    const isDuplicate = activeCycles.some(
+    const isDuplicate = cycles.some(
       (cycle) => cycle.displayName?.toLowerCase() === trimmedName.toLowerCase()
     );
 
@@ -76,18 +82,13 @@ function CycleManager() {
       return;
     }
 
-    setIsAddingCycle(true);
     setShowAddModal(false);
 
     try {
-      // Generate a temporary ID for the new cycle
-      const tempId = `temp-${Date.now()}`;
-
-      // Prepare template data for the new cycle
-      const now = new Date().toISOString();
-      const templateCycle:Cycle = {
-        id: tempId,
+      // Create new cycle via Redux
+      const resultAction = await dispatch(createCycle({
         displayName: trimmedName,
+        status: "draft",
         data: {
           phases: [
             {
@@ -106,26 +107,24 @@ function CycleManager() {
                 }
               ]
             }
-          ],
+          ]
         },
-        status: "draft",
-        created_at: now,
-        updated_at: now,
-        tested_at: null,
         engineer_note: "",
-        summary: "",
-      };
+        summary: ""
+      }));
 
-      // Add the new cycle to Redux
-      dispatch(updateCycleOptimistically(templateCycle));
-
-      // Navigate to the detail page
-      navigate(`/cycle/${tempId}`, { state: { cycle: templateCycle, isNew: true } });
+      if (createCycle.fulfilled.match(resultAction)) {
+        // Navigate to the detail page
+        navigate(`/cycle/${resultAction.payload.id}`, { 
+          state: { cycle: resultAction.payload, isNew: true } 
+        });
+      } else {
+        throw new Error('Failed to create cycle');
+      }
     } catch (error) {
       console.error("Failed to create new cycle:", error);
       alert("Failed to create new cycle: " + (error as Error).message);
     } finally {
-      setIsAddingCycle(false);
       setNewCycleName("");
     }
   };
@@ -137,45 +136,90 @@ function CycleManager() {
   };
 
   // Search handler (semantic search on submit)
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!inputVal.trim()) return;
-    setLoadingSearch(true);
-    setIsTyping(false);
+const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  if (!inputVal.trim()) return;
+  setLoadingSearch(true);
+  setIsTyping(false);
 
-    try {
-      const queryEmbedding = await getEmbedding(inputVal);
-      const sorted = getSemanticSearchResults(queryEmbedding, activeCycles, 0.7);
-      setSearchResults(sorted);
-      setSearchPrompt(inputVal.trim());
-      setInputVal("");
-      setPage(1);
-    } catch (err) {
-      alert("Search failed: " + (err as Error).message);
-    } finally {
-      setLoadingSearch(false);
-    }
-  };
+  try {
+    // Get embedding for the search query
+    const queryEmbedding = await getEmbedding(inputVal.trim());
+    
+    // Perform semantic search on cycles
+    const searchableFields = cycles.map(cycle => ({
+      id: cycle.id,
+      searchableText: [
+        cycle.displayName || '',
+        cycle.summary || '',
+        cycle.engineer_note || '',
+        cycle.status || '',
+        // Include phase names and component labels for deeper search
+        ...(cycle.data?.phases?.map(phase => [
+          phase.name || '',
+          ...(phase.components?.map(comp => comp.label || '') || [])
+        ]).flat() || [])
+      ].filter(Boolean).join(' ')
+    }));
+
+    // Get semantic search results with similarity threshold
+    const sortedIds = getSemanticSearchResults(
+      queryEmbedding, 
+      searchableFields, 
+      0.65 // Lower threshold for more results
+    );
+
+    // Set search results - these are cycle IDs
+    setSearchResults(sortedIds);
+    setSearchPrompt(inputVal.trim());
+    setInputVal("");
+    setPage(1);
+
+    // Log search results for debugging
+    console.log(`Semantic search for "${inputVal.trim()}" found ${sortedIds.length} results`);
+    
+  } catch (err) {
+    console.error("Search error:", err);
+    alert("Search failed: " + (err as Error).message);
+    
+    // Fallback to simple text search if semantic search fails
+    const fallbackResults = cycles
+      .filter(cycle => 
+        cycle.displayName?.toLowerCase().includes(inputVal.toLowerCase()) ||
+        cycle.summary?.toLowerCase().includes(inputVal.toLowerCase()) ||
+        cycle.engineer_note?.toLowerCase().includes(inputVal.toLowerCase())
+      )
+      .map(cycle => cycle.id);
+    
+    setSearchResults(fallbackResults);
+    setSearchPrompt(inputVal.trim() + " (text search)");
+    setInputVal("");
+    setPage(1);
+    
+  } finally {
+    setLoadingSearch(false);
+  }
+};
 
   // Name filter as you type
   const nameFilteredCycles = React.useMemo(() => {
     if (isTyping && inputVal.trim()) {
       const lower = inputVal.trim().toLowerCase();
-      return activeCycles.filter((c) => c.displayName?.toLowerCase().includes(lower));
+      return cycles.filter((c) => c.displayName?.toLowerCase().includes(lower));
     }
     return [];
-  }, [activeCycles, inputVal, isTyping]);
+  }, [cycles, inputVal, isTyping]);
 
   // Cycles to display: searchResults > nameFilteredCycles > all cycles
   const cyclesToDisplay = React.useMemo(() => {
     if (searchResults && searchResults.length > 0) {
-      return activeCycles.filter((c) => searchResults.includes(c.id));
+      return cycles.filter((c) => searchResults.includes(c.id));
     }
     if (inputVal.trim() && isTyping) {
       return nameFilteredCycles;
     }
-    return activeCycles;
-  }, [activeCycles, searchResults, inputVal, isTyping, nameFilteredCycles]);
+    return cycles;
+  }, [cycles, searchResults, inputVal, isTyping, nameFilteredCycles]);
 
   // Apply status filter if not 'all status'
   const statusFilteredCycles =
@@ -205,15 +249,19 @@ function CycleManager() {
       <div className="w-full flex flex-row justify-between items-center gap-4 mb-4">
         <div className="flex items-center gap-3">
           {/* Source Indicator */}
-          <div className={`px-3 py-1 rounded-full text-xs font-medium bg-blue-900/30 text-blue-300 border border-blue-600/30`}>
-            {`Local: ${localDirectoryPath ? '...' + localDirectoryPath.slice(-20) : 'No directory'}`}
+          <div className={`px-3 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-300 border border-green-600/30`}>
+            Redux Store (API)
           </div>
           {/* Cycle count */}
           <div className="text-gray-400 text-sm">
-            {activeCycles.length} cycle{activeCycles.length !== 1 ? 's' : ''}
+            {cycles.length} cycle{cycles.length !== 1 ? 's' : ''}
           </div>
+          {error && (
+            <div className="text-red-400 text-sm">
+              Error: {error}
+            </div>
+          )}
         </div>
-       
       </div>
 
       <div className="w-full flex flex-row justify-between items-center gap-4">
@@ -249,7 +297,6 @@ function CycleManager() {
             </div>
           )}
         </div>
-        {/* Add New Cycle and Refresh Buttons Side by Side */}
         <div className="flex flex-row gap-2 items-center">
           <Button
             func={handleAddNewCycle}
@@ -257,7 +304,7 @@ function CycleManager() {
             label="Add New Cycle"
             icon={PlusIcon}
           />
-       
+
         </div>
       </div>
 
@@ -276,10 +323,10 @@ function CycleManager() {
         ) : cyclesToDisplay.length === 0 ? (
           <div className="text-gray-400 text-center mt-2 select-none">
             <span className="block mb-2 text-lg font-semibold">
-              {"No local cycles found."}
+              {"No cycles found."}
             </span>
             <span className="text-gray-500">
-              {"Add JSON files to your local directory or set the directory path in the header."}
+              {"Create a new cycle to get started."}
             </span>
           </div>
         ) : (
@@ -287,16 +334,8 @@ function CycleManager() {
             {pagedCycles.map((cycle) => (
               <CycleFile cycle={cycle} key={cycle.id} />
             ))}
-            {isAddingCycle && (
-              <div className="bg-gray-800 rounded-lg p-4 animate-pulse">
-                <div className="h-4 bg-gray-700 rounded mb-2"></div>
-                <div className="h-3 bg-gray-700 rounded w-3/4 mb-2"></div>
-                <div className="h-2 bg-gray-700 rounded w-1/2"></div>
-                <div className="mt-4 h-8 bg-gray-700 rounded"></div>
-              </div>
-            )}
             {Array.from({
-              length: CYCLES_PER_PAGE - pagedCycles.length - (isAddingCycle ? 1 : 0),
+              length: CYCLES_PER_PAGE - pagedCycles.length,
             }).map((_, idx) => (
               <div key={`empty-${idx}`} />
             ))}
@@ -365,8 +404,9 @@ function CycleManager() {
                   type="submit"
                   style={{ backgroundColor: "#3b82f6" }}
                   className="px-4 py-2 text-white rounded hover:bg-blue-700 transition-colors"
+                  disabled={isLoading}
                 >
-                  Create Cycle
+                  {isLoading ? "Creating..." : "Create Cycle"}
                 </button>
               </div>
             </form>
