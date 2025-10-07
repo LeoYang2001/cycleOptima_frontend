@@ -168,20 +168,11 @@ function ComponentLibrary({
   isLoading: boolean;
   setSelectedComponent: (component: CycleComponent | null) => void;
 }) {
-  const error = useSelector((state: RootState) => selectLibraryError(state));
 
   if (isLoading) {
     return (
       <div className="p-4">
         <div className="text-gray-500">Loading components...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-4">
-        <div className="text-red-500">Error: {error}</div>
       </div>
     );
   }
