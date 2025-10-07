@@ -24,9 +24,10 @@ import PhaseTimeLineView from "../cycleDetail/PhaseTimeLineView";
 import { Plus } from "lucide-react";
 import TicksLineComponents from "../cycleDetail/CycleTicksLine";
 import type { Phase } from "../../types/common/Phase";
+import type { LocalCycle } from "../../types/common/LocalCycle";
 
 interface CycleTimeLinePreviewProp {
-  cycle: Cycle;
+  cycle: Cycle | LocalCycle;
   size?: string;
   func?: () => void;
   phases?: Phase[]; // Optional prop for phases
@@ -51,6 +52,7 @@ function CycleTimeLinePreview({
     totalCycleDuration,
     phaseDurations
   );
+  
 
   //for detailed Timeline preview
   const [ticks, setTicks] = useState(generateTicks(totalCycleDuration * 1.15));
@@ -68,6 +70,7 @@ function CycleTimeLinePreview({
   // Update ticks when totalCycleDuration changes
   useEffect(() => {
     setTicks(generateTicks(totalCycleDuration * 1.15));
+    console.log('ticks updated', ticks);
   }, [totalCycleDuration]);
 
   const handleDragStart = (event: DragEndEvent) => {
@@ -84,6 +87,7 @@ function CycleTimeLinePreview({
       setPhases((items) => arrayMove(items, oldIndex, newIndex));
     }
   };
+  
 
   if (size === "small")
     return (

@@ -23,6 +23,7 @@ export async function fetchLibraryComponents(): Promise<CycleComponent[]> {
     const data = await res.json();
     console.log("Library components fetched successfully:", data);
 
+
     // Transform the API response to match CycleComponent interface
     return data.map((item: any) => ({
       id: item.id,

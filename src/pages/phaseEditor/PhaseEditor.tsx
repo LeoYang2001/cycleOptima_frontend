@@ -27,6 +27,7 @@ import ComponentEditor from "../../components/phaseEditor/ComponentEditor";
 import SensorTriggerModal from "../../components/phaseEditor/SensorTriggerModal";
 import type { CycleComponent } from "../../types/common/CycleComponent";
 import type { SensorTrigger } from "../../types/common/Phase";
+import { LIBRARY_COMPONENTS } from "../../lib/libraryComponents";
 
 function PhaseEditor() {
   const dispatch = useDispatch<AppDispatch>();
@@ -42,12 +43,8 @@ function PhaseEditor() {
   const cycles = useSelector((state: RootState) => state.cycles.cycles);
   const cyclesLoading = useSelector(selectCyclesLoading);
   const cyclesError = useSelector(selectCyclesError);
-  const libraryComponents = useSelector((state: RootState) =>
-    selectAllLibraryComponents(state)
-  );
-  const isLoading = useSelector((state: RootState) =>
-    selectLibraryLoading(state)
-  );
+  const libraryComponents =  LIBRARY_COMPONENTS
+  const isLoading = false
 
   // All useState hooks
   const [phaseName, setPhaseName] = useState("");
@@ -421,7 +418,7 @@ function PhaseEditor() {
               <ComponentLibrary
                 setSelectedComponent={setSelectedComponent}
                 libraryComponents={libraryComponents}
-                isLoading={isLoading}
+                isLoading={false}
               />
             </Section>
           </div>

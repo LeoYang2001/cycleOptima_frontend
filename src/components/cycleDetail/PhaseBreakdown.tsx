@@ -9,15 +9,15 @@ import PhaseTimeLinePreview from "../common/PhaseTimeLinePreview";
 import type { Cycle } from "../../types/common/Cycle";
 import { Trash2, Zap, Gauge } from "lucide-react";
 import { Link } from "react-router-dom";
+import type { LocalCycle } from "../../types/common/LocalCycle";
 
 interface PhaseBreakdownProps {
   Phases: Phase[];
-  cycle: Cycle;
+  cycle: Cycle | LocalCycle;
   deletePhase: (phaseId: string) => void;
 }
 
 function PhaseBreakdown({ Phases, cycle, deletePhase }: PhaseBreakdownProps) {
-  console.log('cycle read from phase breakdown', cycle);
 
   // Helper function to get sensor trigger display info
   const getSensorTriggerInfo = (phase: Phase) => {
@@ -58,6 +58,15 @@ function PhaseBreakdown({ Phases, cycle, deletePhase }: PhaseBreakdownProps) {
     };
   };
 
+  // Determine if this is a local cycle and generate the correct navigation path
+  const isLocalCycle = cycle.id.startsWith("local-cycle");
+  
+  const getPhaseEditPath = (phaseId: string) => {
+    return isLocalCycle 
+      ? `/cycle-local/${cycle.id}/phase/${phaseId}`
+      : `/cycle/${cycle.id}/phase/${phaseId}`;
+  };
+
   return (
     <div className="w-full h-full flex flex-col gap-3">
       {Phases.map((phase) => {
@@ -70,7 +79,7 @@ function PhaseBreakdown({ Phases, cycle, deletePhase }: PhaseBreakdownProps) {
         const sensorTriggerInfo = getSensorTriggerInfo(phase);
 
         return (
-          <Link to={`/cycle/${cycle.id}/phase/${phase.id}`} key={phase.id}>
+          <Link to={getPhaseEditPath(phase.id)} key={phase.id}>
             <div
               style={{
                 backgroundColor: "#111113",

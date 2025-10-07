@@ -1,4 +1,5 @@
 import type { Cycle } from "../types/common/Cycle";
+import type { LocalCycle } from "../types/common/LocalCycle";
 import type { Phase } from "../types/common/Phase";
 
 type PhaseDuration = {
@@ -17,7 +18,7 @@ type Result = {
   totalCycleDuration: number;
   phaseDurations: PhaseDuration[];
 };
-export function calculateCycleDurations(cycle: Cycle): Result {
+export function calculateCycleDurations(cycle: Cycle | LocalCycle): Result {
   const data = cycle.data;
   const phaseDurations: PhaseDuration[] = [];
 

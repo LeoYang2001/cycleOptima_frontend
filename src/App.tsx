@@ -16,6 +16,10 @@ import "./utils/testSocket"; // Import test utility
 import { API_CONFIG, getNgrokHeaders } from "./config/api";
 import DeviceGuard from "./components/common/DeviceGuard";
 import { websocketManager } from "./store/websocketSlice";
+import CycleDetailLocal from "./pages/cycleDetail/CycleDetailLocal";
+import PhaseEditorLocal from "./pages/phaseEditor/PhaseEditorLocal";
+
+
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -87,6 +91,8 @@ function App() {
             <Route path="/cycle/:id/phase/:phaseId" element={<PhaseEditor />} />
             {/* Catch-all route - redirect any unmatched routes to home */}
             <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/cycle-local/:id" element={<CycleDetailLocal />} />
+            <Route path="/cycle-local/:cycleId/phase/:phaseId" element={<PhaseEditorLocal />} />
           </Route>
         </Routes>
       </BrowserRouter>

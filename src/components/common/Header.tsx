@@ -480,24 +480,7 @@ const handleSaveWsConfig = () => {
           )}
         </div>
 
-        {/* Path Indicator */}
-        <div
-          className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
-            localCyclesPath
-              ? "bg-green-900/20 border-green-600/30 hover:bg-green-800/30"
-              : "bg-yellow-900/20 border-yellow-600/30 hover:bg-yellow-800/30"
-          }`}
-          onClick={() => setShowPathModal(true)}
-          title={localCyclesPath || "Click to set cycles directory"}
-        >
-          <span
-            className={`text-xs font-medium ${
-              localCyclesPath ? "text-green-300" : "text-yellow-300"
-            }`}
-          >
-            {getPathDisplayName(localCyclesPath)}
-          </span>
-        </div>
+       
       </div>
 
       <div

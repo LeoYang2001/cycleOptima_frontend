@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PlaceholdersAndVanishInput } from "../../components/ui/placeholders-and-vanish-input";
 import Button from "../../components/common/Button";
-import { PlusIcon, RotateCcw } from "lucide-react";
+import { PlusIcon, RotateCcw, Upload } from "lucide-react";
 import Dropdown from "../../components/common/Dropdown";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
@@ -20,6 +20,8 @@ import {
   selectCyclesError,
   clearError
 } from "../../store/cycleSlice";
+import type { LocalCycle } from "../../types/common/LocalCycle";
+import JsonUploadModal from "../../components/cycleManager/JsonUploadModal";
 
 const statusOptions = ["all status", "draft", "tested"];
 const CYCLES_PER_PAGE = 30; // 6 cols * 5 rows
@@ -34,14 +36,49 @@ function CycleManager() {
   const [searchPrompt, setSearchPrompt] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCycleName, setNewCycleName] = useState("");
+  const [localCycles, setLocalCycles] = useState<LocalCycle[]>([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+
+  useEffect(() => {
+    const loadLocalCycles = () => {
+      const storedCycles = JSON.parse(localStorage.getItem('localCycles') || '[]');
+      setLocalCycles(storedCycles);
+      console.log(`Found ${storedCycles.length} local cycles`);
+    };
+
+    loadLocalCycles();
+    
+    // Listen for storage changes to update when cycles are added/modified
+    const handleStorageChange = () => {
+      loadLocalCycles();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
 
   // Redux selectors
-  const cycles = useSelector(selectAllCycles);
+  const apiCycles = useSelector(selectAllCycles);
   const isLoading = useSelector(selectCyclesLoading);
   const error = useSelector(selectCyclesError);
+
+
+  const allCycles = React.useMemo(() => {
+    const combinedCycles = [...apiCycles];
+    
+    // Add local cycles with a flag to identify them
+    localCycles.forEach(localCycle => {
+      combinedCycles.push({
+        ...localCycle,
+        isLocal: true
+      } as Cycle & { isLocal: boolean });
+    });
+    
+    return combinedCycles;
+  }, [apiCycles, localCycles]);
 
   // Fetch cycles on component mount
   useEffect(() => {
@@ -71,7 +108,7 @@ function CycleManager() {
 
     // Check for duplicate cycle names
     const trimmedName = newCycleName.trim();
-    const isDuplicate = cycles.some(
+    const isDuplicate = allCycles.some(
       (cycle) => cycle.displayName?.toLowerCase() === trimmedName.toLowerCase()
     );
 
@@ -85,7 +122,7 @@ function CycleManager() {
     setShowAddModal(false);
 
     try {
-      // Create new cycle via Redux
+      // Try to create cycle via Redux (API)
       const resultAction = await dispatch(createCycle({
         displayName: trimmedName,
         status: "draft",
@@ -122,8 +159,50 @@ function CycleManager() {
         throw new Error('Failed to create cycle');
       }
     } catch (error) {
-      console.error("Failed to create new cycle:", error);
-      alert("Failed to create new cycle: " + (error as Error).message);
+      console.error("Failed to create new cycle via API:", error);
+      
+      // Server is down - create cycle locally
+      const localCycle = {
+        id: `local-cycle-${Date.now()}`,
+        displayName: trimmedName,
+        status: "draft" as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        engineer_note: "",
+        summary: "",
+        data: {
+          phases: [
+            {
+              id: "1755269543284",
+              name: "phase1",
+              color: "4ADE80",
+              startTime: 0,
+              components: [
+                {
+                  id: "1756939954770",
+                  label: "Standard Retractor Cycle",
+                  start: 0,
+                  compId: "Retractor",
+                  duration: 60000,
+                  motorConfig: null
+                }
+              ]
+            }
+          ]
+        }
+      };
+
+      // Save to localStorage
+      const localCycles = JSON.parse(localStorage.getItem('localCycles') || '[]');
+      localCycles.push(localCycle);
+      localStorage.setItem('localCycles', JSON.stringify(localCycles));
+
+      // Navigate to local cycle detail page
+      navigate(`/cycle-local/${localCycle.id}`, { 
+        state: { cycle: localCycle, isNew: true, isLocal: true } 
+      });
+      
+      alert("Server unavailable. Cycle created locally and will sync when connection is restored.");
     } finally {
       setNewCycleName("");
     }
@@ -136,90 +215,90 @@ function CycleManager() {
   };
 
   // Search handler (semantic search on submit)
-const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  if (!inputVal.trim()) return;
-  setLoadingSearch(true);
-  setIsTyping(false);
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!inputVal.trim()) return;
+    setLoadingSearch(true);
+    setIsTyping(false);
 
-  try {
-    // Get embedding for the search query
-    const queryEmbedding = await getEmbedding(inputVal.trim());
-    
-    // Perform semantic search on cycles
-    const searchableFields = cycles.map(cycle => ({
-      id: cycle.id,
-      searchableText: [
-        cycle.displayName || '',
-        cycle.summary || '',
-        cycle.engineer_note || '',
-        cycle.status || '',
-        // Include phase names and component labels for deeper search
-        ...(cycle.data?.phases?.map(phase => [
-          phase.name || '',
-          ...(phase.components?.map(comp => comp.label || '') || [])
-        ]).flat() || [])
-      ].filter(Boolean).join(' ')
-    }));
+    try {
+      // Get embedding for the search query
+      const queryEmbedding = await getEmbedding(inputVal.trim());
+      
+      // Perform semantic search on cycles
+      const searchableFields = allCycles.map(cycle => ({
+        id: cycle.id,
+        searchableText: [
+          cycle.displayName || '',
+          cycle.summary || '',
+          cycle.engineer_note || '',
+          cycle.status || '',
+          // Include phase names and component labels for deeper search
+          ...(cycle.data?.phases?.map(phase => [
+            phase.name || '',
+            ...(phase.components?.map(comp => comp.label || '') || [])
+          ]).flat() || [])
+        ].filter(Boolean).join(' ')
+      }));
 
-    // Get semantic search results with similarity threshold
-    const sortedIds = getSemanticSearchResults(
-      queryEmbedding, 
-      searchableFields, 
-      0.65 // Lower threshold for more results
-    );
+      // Get semantic search results with similarity threshold
+      const sortedIds = getSemanticSearchResults(
+        queryEmbedding, 
+        searchableFields, 
+        0.65 // Lower threshold for more results
+      );
 
-    // Set search results - these are cycle IDs
-    setSearchResults(sortedIds);
-    setSearchPrompt(inputVal.trim());
-    setInputVal("");
-    setPage(1);
+      // Set search results - these are cycle IDs
+      setSearchResults(sortedIds);
+      setSearchPrompt(inputVal.trim());
+      setInputVal("");
+      setPage(1);
 
-    // Log search results for debugging
-    console.log(`Semantic search for "${inputVal.trim()}" found ${sortedIds.length} results`);
-    
-  } catch (err) {
-    console.error("Search error:", err);
-    alert("Search failed: " + (err as Error).message);
-    
-    // Fallback to simple text search if semantic search fails
-    const fallbackResults = cycles
-      .filter(cycle => 
-        cycle.displayName?.toLowerCase().includes(inputVal.toLowerCase()) ||
-        cycle.summary?.toLowerCase().includes(inputVal.toLowerCase()) ||
-        cycle.engineer_note?.toLowerCase().includes(inputVal.toLowerCase())
-      )
-      .map(cycle => cycle.id);
-    
-    setSearchResults(fallbackResults);
-    setSearchPrompt(inputVal.trim() + " (text search)");
-    setInputVal("");
-    setPage(1);
-    
-  } finally {
-    setLoadingSearch(false);
-  }
-};
+      // Log search results for debugging
+      console.log(`Semantic search for "${inputVal.trim()}" found ${sortedIds.length} results`);
+      
+    } catch (err) {
+      console.error("Search error:", err);
+      alert("Search failed: " + (err as Error).message);
+      
+      // Fallback to simple text search if semantic search fails
+      const fallbackResults = allCycles
+        .filter(cycle => 
+          cycle.displayName?.toLowerCase().includes(inputVal.toLowerCase()) ||
+          cycle.summary?.toLowerCase().includes(inputVal.toLowerCase()) ||
+          cycle.engineer_note?.toLowerCase().includes(inputVal.toLowerCase())
+        )
+        .map(cycle => cycle.id);
+      
+      setSearchResults(fallbackResults);
+      setSearchPrompt(inputVal.trim() + " (text search)");
+      setInputVal("");
+      setPage(1);
+      
+    } finally {
+      setLoadingSearch(false);
+    }
+  };
 
   // Name filter as you type
   const nameFilteredCycles = React.useMemo(() => {
     if (isTyping && inputVal.trim()) {
       const lower = inputVal.trim().toLowerCase();
-      return cycles.filter((c) => c.displayName?.toLowerCase().includes(lower));
+      return allCycles.filter((c) => c.displayName?.toLowerCase().includes(lower));
     }
     return [];
-  }, [cycles, inputVal, isTyping]);
+  }, [allCycles, inputVal, isTyping]);
 
   // Cycles to display: searchResults > nameFilteredCycles > all cycles
   const cyclesToDisplay = React.useMemo(() => {
     if (searchResults && searchResults.length > 0) {
-      return cycles.filter((c) => searchResults.includes(c.id));
+      return allCycles.filter((c) => searchResults.includes(c.id));
     }
     if (inputVal.trim() && isTyping) {
       return nameFilteredCycles;
     }
-    return cycles;
-  }, [cycles, searchResults, inputVal, isTyping, nameFilteredCycles]);
+    return allCycles;
+  }, [allCycles, searchResults, inputVal, isTyping, nameFilteredCycles]);
 
   // Apply status filter if not 'all status'
   const statusFilteredCycles =
@@ -243,6 +322,35 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     setPage(1);
   };
 
+  // Handler for uploading a cycle from JSON
+  const handleUploadCycle = (cycle: LocalCycle) => {
+    try {
+      // Get existing local cycles
+      const existingCycles = JSON.parse(localStorage.getItem('localCycles') || '[]');
+      
+      // Add the new cycle
+      existingCycles.push(cycle);
+      
+      // Save to localStorage
+      localStorage.setItem('localCycles', JSON.stringify(existingCycles));
+      
+      // Update state to trigger re-render
+      setLocalCycles(existingCycles);
+      
+      // Show success message
+      alert(`Cycle "${cycle.displayName}" uploaded successfully!`);
+      
+      // Navigate to the uploaded cycle
+      navigate(`/cycle-local/${cycle.id}`, { 
+        state: { cycle, isNew: false, isLocal: true } 
+      });
+      
+    } catch (error) {
+      console.error('Failed to upload cycle:', error);
+      alert('Failed to upload cycle. Please try again.');
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header with source indicator */}
@@ -254,7 +362,7 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
           </div>
           {/* Cycle count */}
           <div className="text-gray-400 text-sm">
-            {cycles.length} cycle{cycles.length !== 1 ? 's' : ''}
+            {allCycles.length} cycle{allCycles.length !== 1 ? 's' : ''}
           </div>
           {error && (
             <div className="text-red-400 text-sm">
@@ -298,6 +406,12 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
           )}
         </div>
         <div className="flex flex-row gap-2 items-center">
+          <Button
+            func={() => setShowUploadModal(true)}
+            
+            label="Upload JSON"
+            icon={Upload}
+          />
           <Button
             func={handleAddNewCycle}
             theme="dark"
@@ -413,6 +527,14 @@ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
           </div>
         </div>
       )}
+
+      {/* Upload JSON Modal */}
+      <JsonUploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUpload={handleUploadCycle}
+        existingCycles={localCycles}
+      />
     </div>
   );
 }

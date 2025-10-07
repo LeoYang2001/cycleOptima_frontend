@@ -3,7 +3,8 @@ import type { RootState } from './index';
 import type { Cycle } from '../types/common/Cycle';
 
 // API base URL
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = 'https://192.168.0.197:8443/api';
+// const API_BASE = 'https://192.168.0.197:2000/api';
 
 // Async thunks for API operations
 export const fetchAllCycles = createAsyncThunk(
