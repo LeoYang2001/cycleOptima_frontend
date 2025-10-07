@@ -3,14 +3,14 @@ import type { Cycle } from "../../types/common/Cycle";
 import { calculateCycleDurations } from "../../utils/totalDuration";
 import { formatTimeLabel } from "../../utils/formatTime";
 import { Clock, Logs, Pause, Puzzle } from "lucide-react";
+import type { LocalCycle } from "../../types/common/LocalCycle";
 
 interface CycleSummaryProps {
-  cycle: Cycle;
+  cycle: Cycle | LocalCycle;
 }
 
 function CycleSummary({ cycle }: CycleSummaryProps) {
   const { totalCycleDuration, phaseDurations } = calculateCycleDurations(cycle);
-  console.log("cycle from summary:", cycle);
   function calculateTotalComponents() {
     const phases = cycle.data.phases || [];
     let sum = 0;

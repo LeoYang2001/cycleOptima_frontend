@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { PlaceholdersAndVanishInput } from "../../components/ui/placeholders-and-vanish-input";
 import Button from "../../components/common/Button";
-import { PlusIcon, FolderOpen, RotateCcw } from "lucide-react";
+import { PlusIcon, RotateCcw, Upload } from "lucide-react";
 import Dropdown from "../../components/common/Dropdown";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
@@ -10,14 +10,18 @@ import { getSemanticSearchResults } from "../../utils/semanticSearch";
 import { X } from "lucide-react";
 import { PuffLoader } from "react-spinners";
 import CycleFile from "../../components/cycleManager/CycleFile";
-import { 
-  selectLocalCycles, 
-  selectLocalCyclesLoading, 
-  selectLocalCyclesDirectoryPath,
-  updateCycleOptimistically,
-} from "../../store/localCyclesSlice";
 import { useNavigate } from "react-router-dom";
 import type { Cycle } from "../../types/common/Cycle";
+import {
+  fetchAllCycles,
+  createCycle,
+  selectAllCycles,
+  selectCyclesLoading,
+  selectCyclesError,
+  clearError
+} from "../../store/cycleSlice";
+import type { LocalCycle } from "../../types/common/LocalCycle";
+import JsonUploadModal from "../../components/cycleManager/JsonUploadModal";
 
 const statusOptions = ["all status", "draft", "tested"];
 const CYCLES_PER_PAGE = 30; // 6 cols * 5 rows
@@ -30,27 +34,66 @@ function CycleManager() {
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [searchPrompt, setSearchPrompt] = useState("");
-  const [isAddingCycle, setIsAddingCycle] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCycleName, setNewCycleName] = useState("");
+  const [localCycles, setLocalCycles] = useState<LocalCycle[]>([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
-  const navigate = useNavigate()
+  useEffect(() => {
+    const loadLocalCycles = () => {
+      const storedCycles = JSON.parse(localStorage.getItem('localCycles') || '[]');
+      setLocalCycles(storedCycles);
+      console.log(`Found ${storedCycles.length} local cycles`);
+    };
 
-  // Redux selectors for local cycles only
-  const localCycles = useSelector(selectLocalCycles);
-  const localCyclesLoading = useSelector(selectLocalCyclesLoading);
-  const localDirectoryPath = useSelector(selectLocalCyclesDirectoryPath);
+    loadLocalCycles();
+    
+    // Listen for storage changes to update when cycles are added/modified
+    const handleStorageChange = () => {
+      loadLocalCycles();
+    };
 
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
 
-  // Get active cycles from local only
-  const activeCycles = localCycles;
-  const isLoading = localCyclesLoading;
+  // Redux selectors
+  const apiCycles = useSelector(selectAllCycles);
+  const isLoading = useSelector(selectCyclesLoading);
+  const error = useSelector(selectCyclesError);
 
-  // Refresh cycles from local folder
-  const handleRefreshCycles = () => {
-    window.dispatchEvent(new CustomEvent('refreshLocalCycles'));
-  };
+
+  const allCycles = React.useMemo(() => {
+    const combinedCycles = [...apiCycles];
+    
+    // Add local cycles with a flag to identify them
+    localCycles.forEach(localCycle => {
+      combinedCycles.push({
+        ...localCycle,
+        isLocal: true
+      } as Cycle & { isLocal: boolean });
+    });
+    
+    return combinedCycles;
+  }, [apiCycles, localCycles]);
+
+  // Fetch cycles on component mount
+  useEffect(() => {
+    console.log('Fetching cycles from Redux...');
+    dispatch(fetchAllCycles());
+  }, [dispatch]);
+
+  // Clear error when component unmounts
+  useEffect(() => {
+    return () => {
+      if (error) {
+        dispatch(clearError());
+      }
+    };
+  }, [error, dispatch]);
 
   // Handler for opening add new cycle modal
   const handleAddNewCycle = () => {
@@ -65,7 +108,7 @@ function CycleManager() {
 
     // Check for duplicate cycle names
     const trimmedName = newCycleName.trim();
-    const isDuplicate = activeCycles.some(
+    const isDuplicate = allCycles.some(
       (cycle) => cycle.displayName?.toLowerCase() === trimmedName.toLowerCase()
     );
 
@@ -76,18 +119,13 @@ function CycleManager() {
       return;
     }
 
-    setIsAddingCycle(true);
     setShowAddModal(false);
 
     try {
-      // Generate a temporary ID for the new cycle
-      const tempId = `temp-${Date.now()}`;
-
-      // Prepare template data for the new cycle
-      const now = new Date().toISOString();
-      const templateCycle:Cycle = {
-        id: tempId,
+      // Try to create cycle via Redux (API)
+      const resultAction = await dispatch(createCycle({
         displayName: trimmedName,
+        status: "draft",
         data: {
           phases: [
             {
@@ -106,26 +144,66 @@ function CycleManager() {
                 }
               ]
             }
-          ],
+          ]
         },
-        status: "draft",
-        created_at: now,
-        updated_at: now,
-        tested_at: null,
+        engineer_note: "",
+        summary: ""
+      }));
+
+      if (createCycle.fulfilled.match(resultAction)) {
+        // Navigate to the detail page
+        navigate(`/cycle/${resultAction.payload.id}`, { 
+          state: { cycle: resultAction.payload, isNew: true } 
+        });
+      } else {
+        throw new Error('Failed to create cycle');
+      }
+    } catch (error) {
+      console.error("Failed to create new cycle via API:", error);
+      
+      // Server is down - create cycle locally
+      const localCycle = {
+        id: `local-cycle-${Date.now()}`,
+        displayName: trimmedName,
+        status: "draft" as const,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         engineer_note: "",
         summary: "",
+        data: {
+          phases: [
+            {
+              id: "1755269543284",
+              name: "phase1",
+              color: "4ADE80",
+              startTime: 0,
+              components: [
+                {
+                  id: "1756939954770",
+                  label: "Standard Retractor Cycle",
+                  start: 0,
+                  compId: "Retractor",
+                  duration: 60000,
+                  motorConfig: null
+                }
+              ]
+            }
+          ]
+        }
       };
 
-      // Add the new cycle to Redux
-      dispatch(updateCycleOptimistically(templateCycle));
+      // Save to localStorage
+      const localCycles = JSON.parse(localStorage.getItem('localCycles') || '[]');
+      localCycles.push(localCycle);
+      localStorage.setItem('localCycles', JSON.stringify(localCycles));
 
-      // Navigate to the detail page
-      navigate(`/cycle/${tempId}`, { state: { cycle: templateCycle, isNew: true } });
-    } catch (error) {
-      console.error("Failed to create new cycle:", error);
-      alert("Failed to create new cycle: " + (error as Error).message);
+      // Navigate to local cycle detail page
+      navigate(`/cycle-local/${localCycle.id}`, { 
+        state: { cycle: localCycle, isNew: true, isLocal: true } 
+      });
+      
+      alert("Server unavailable. Cycle created locally and will sync when connection is restored.");
     } finally {
-      setIsAddingCycle(false);
       setNewCycleName("");
     }
   };
@@ -144,14 +222,59 @@ function CycleManager() {
     setIsTyping(false);
 
     try {
-      const queryEmbedding = await getEmbedding(inputVal);
-      const sorted = getSemanticSearchResults(queryEmbedding, activeCycles, 0.7);
-      setSearchResults(sorted);
+      // Get embedding for the search query
+      const queryEmbedding = await getEmbedding(inputVal.trim());
+      
+      // Perform semantic search on cycles
+      const searchableFields = allCycles.map(cycle => ({
+        id: cycle.id,
+        searchableText: [
+          cycle.displayName || '',
+          cycle.summary || '',
+          cycle.engineer_note || '',
+          cycle.status || '',
+          // Include phase names and component labels for deeper search
+          ...(cycle.data?.phases?.map(phase => [
+            phase.name || '',
+            ...(phase.components?.map(comp => comp.label || '') || [])
+          ]).flat() || [])
+        ].filter(Boolean).join(' ')
+      }));
+
+      // Get semantic search results with similarity threshold
+      const sortedIds = getSemanticSearchResults(
+        queryEmbedding, 
+        searchableFields, 
+        0.65 // Lower threshold for more results
+      );
+
+      // Set search results - these are cycle IDs
+      setSearchResults(sortedIds);
       setSearchPrompt(inputVal.trim());
       setInputVal("");
       setPage(1);
+
+      // Log search results for debugging
+      console.log(`Semantic search for "${inputVal.trim()}" found ${sortedIds.length} results`);
+      
     } catch (err) {
+      console.error("Search error:", err);
       alert("Search failed: " + (err as Error).message);
+      
+      // Fallback to simple text search if semantic search fails
+      const fallbackResults = allCycles
+        .filter(cycle => 
+          cycle.displayName?.toLowerCase().includes(inputVal.toLowerCase()) ||
+          cycle.summary?.toLowerCase().includes(inputVal.toLowerCase()) ||
+          cycle.engineer_note?.toLowerCase().includes(inputVal.toLowerCase())
+        )
+        .map(cycle => cycle.id);
+      
+      setSearchResults(fallbackResults);
+      setSearchPrompt(inputVal.trim() + " (text search)");
+      setInputVal("");
+      setPage(1);
+      
     } finally {
       setLoadingSearch(false);
     }
@@ -161,21 +284,21 @@ function CycleManager() {
   const nameFilteredCycles = React.useMemo(() => {
     if (isTyping && inputVal.trim()) {
       const lower = inputVal.trim().toLowerCase();
-      return activeCycles.filter((c) => c.displayName?.toLowerCase().includes(lower));
+      return allCycles.filter((c) => c.displayName?.toLowerCase().includes(lower));
     }
     return [];
-  }, [activeCycles, inputVal, isTyping]);
+  }, [allCycles, inputVal, isTyping]);
 
   // Cycles to display: searchResults > nameFilteredCycles > all cycles
   const cyclesToDisplay = React.useMemo(() => {
     if (searchResults && searchResults.length > 0) {
-      return activeCycles.filter((c) => searchResults.includes(c.id));
+      return allCycles.filter((c) => searchResults.includes(c.id));
     }
     if (inputVal.trim() && isTyping) {
       return nameFilteredCycles;
     }
-    return activeCycles;
-  }, [activeCycles, searchResults, inputVal, isTyping, nameFilteredCycles]);
+    return allCycles;
+  }, [allCycles, searchResults, inputVal, isTyping, nameFilteredCycles]);
 
   // Apply status filter if not 'all status'
   const statusFilteredCycles =
@@ -199,21 +322,54 @@ function CycleManager() {
     setPage(1);
   };
 
+  // Handler for uploading a cycle from JSON
+  const handleUploadCycle = (cycle: LocalCycle) => {
+    try {
+      // Get existing local cycles
+      const existingCycles = JSON.parse(localStorage.getItem('localCycles') || '[]');
+      
+      // Add the new cycle
+      existingCycles.push(cycle);
+      
+      // Save to localStorage
+      localStorage.setItem('localCycles', JSON.stringify(existingCycles));
+      
+      // Update state to trigger re-render
+      setLocalCycles(existingCycles);
+      
+      // Show success message
+      alert(`Cycle "${cycle.displayName}" uploaded successfully!`);
+      
+      // Navigate to the uploaded cycle
+      navigate(`/cycle-local/${cycle.id}`, { 
+        state: { cycle, isNew: false, isLocal: true } 
+      });
+      
+    } catch (error) {
+      console.error('Failed to upload cycle:', error);
+      alert('Failed to upload cycle. Please try again.');
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header with source indicator */}
       <div className="w-full flex flex-row justify-between items-center gap-4 mb-4">
         <div className="flex items-center gap-3">
           {/* Source Indicator */}
-          <div className={`px-3 py-1 rounded-full text-xs font-medium bg-blue-900/30 text-blue-300 border border-blue-600/30`}>
-            {`Local: ${localDirectoryPath ? '...' + localDirectoryPath.slice(-20) : 'No directory'}`}
+          <div className={`px-3 py-1 rounded-full text-xs font-medium bg-green-900/30 text-green-300 border border-green-600/30`}>
+            Redux Store (API)
           </div>
           {/* Cycle count */}
           <div className="text-gray-400 text-sm">
-            {activeCycles.length} cycle{activeCycles.length !== 1 ? 's' : ''}
+            {allCycles.length} cycle{allCycles.length !== 1 ? 's' : ''}
           </div>
+          {error && (
+            <div className="text-red-400 text-sm">
+              Error: {error}
+            </div>
+          )}
         </div>
-       
       </div>
 
       <div className="w-full flex flex-row justify-between items-center gap-4">
@@ -249,15 +405,20 @@ function CycleManager() {
             </div>
           )}
         </div>
-        {/* Add New Cycle and Refresh Buttons Side by Side */}
         <div className="flex flex-row gap-2 items-center">
+          <Button
+            func={() => setShowUploadModal(true)}
+            
+            label="Upload JSON"
+            icon={Upload}
+          />
           <Button
             func={handleAddNewCycle}
             theme="dark"
             label="Add New Cycle"
             icon={PlusIcon}
           />
-       
+
         </div>
       </div>
 
@@ -276,10 +437,10 @@ function CycleManager() {
         ) : cyclesToDisplay.length === 0 ? (
           <div className="text-gray-400 text-center mt-2 select-none">
             <span className="block mb-2 text-lg font-semibold">
-              {"No local cycles found."}
+              {"No cycles found."}
             </span>
             <span className="text-gray-500">
-              {"Add JSON files to your local directory or set the directory path in the header."}
+              {"Create a new cycle to get started."}
             </span>
           </div>
         ) : (
@@ -287,16 +448,8 @@ function CycleManager() {
             {pagedCycles.map((cycle) => (
               <CycleFile cycle={cycle} key={cycle.id} />
             ))}
-            {isAddingCycle && (
-              <div className="bg-gray-800 rounded-lg p-4 animate-pulse">
-                <div className="h-4 bg-gray-700 rounded mb-2"></div>
-                <div className="h-3 bg-gray-700 rounded w-3/4 mb-2"></div>
-                <div className="h-2 bg-gray-700 rounded w-1/2"></div>
-                <div className="mt-4 h-8 bg-gray-700 rounded"></div>
-              </div>
-            )}
             {Array.from({
-              length: CYCLES_PER_PAGE - pagedCycles.length - (isAddingCycle ? 1 : 0),
+              length: CYCLES_PER_PAGE - pagedCycles.length,
             }).map((_, idx) => (
               <div key={`empty-${idx}`} />
             ))}
@@ -365,14 +518,23 @@ function CycleManager() {
                   type="submit"
                   style={{ backgroundColor: "#3b82f6" }}
                   className="px-4 py-2 text-white rounded hover:bg-blue-700 transition-colors"
+                  disabled={isLoading}
                 >
-                  Create Cycle
+                  {isLoading ? "Creating..." : "Create Cycle"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Upload JSON Modal */}
+      <JsonUploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        onUpload={handleUploadCycle}
+        existingCycles={localCycles}
+      />
     </div>
   );
 }

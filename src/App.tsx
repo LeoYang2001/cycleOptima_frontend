@@ -7,7 +7,7 @@ import SystemMonitor from "./pages/monitor/SystemMonitor";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "./store";
 import { useEffect } from "react";
-import { fetchCycles } from "./store/cycleSlice";
+import { fetchAllCycles } from "./store/cycleSlice";
 import { fetchLibrary } from "./store/librarySlice";
 import { io } from "socket.io-client";
 import CycleDetail from "./pages/cycleDetail/CycleDetail";
@@ -16,12 +16,16 @@ import "./utils/testSocket"; // Import test utility
 import { API_CONFIG, getNgrokHeaders } from "./config/api";
 import DeviceGuard from "./components/common/DeviceGuard";
 import { websocketManager } from "./store/websocketSlice";
+import CycleDetailLocal from "./pages/cycleDetail/CycleDetailLocal";
+import PhaseEditorLocal from "./pages/phaseEditor/PhaseEditorLocal";
+
+
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
 
   useEffect(() => {
-    dispatch(fetchCycles());
+    dispatch(fetchAllCycles());
     dispatch(fetchLibrary());
 
     const socket = io(API_CONFIG.BASE_URL, {
@@ -45,17 +49,17 @@ function App() {
     // Listen for cycle events
     // socket.on("cycle_updated", () => {
     //   console.log("🔄 Received cycle_updated event, refetching cycles...");
-    //   dispatch(fetchCycles()); // Refetch when notified
+    //   dispatch(fetchAllCycles()); // Refetch when notified
     // });
 
     socket.on("cycle_created", () => {
       console.log("🆕 Received cycle_created event, refetching cycles...");
-      dispatch(fetchCycles()); // Refetch when notified
+      dispatch(fetchAllCycles()); // Refetch when notified
     });
 
     socket.on("cycle_deleted", () => {
       console.log("🗑️ Received cycle_deleted event, refetching cycles...");
-      dispatch(fetchCycles()); // Refetch when notified
+      dispatch(fetchAllCycles()); // Refetch when notified
     });
 
     return () => {
@@ -87,6 +91,8 @@ function App() {
             <Route path="/cycle/:id/phase/:phaseId" element={<PhaseEditor />} />
             {/* Catch-all route - redirect any unmatched routes to home */}
             <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/cycle-local/:id" element={<CycleDetailLocal />} />
+            <Route path="/cycle-local/:cycleId/phase/:phaseId" element={<PhaseEditorLocal />} />
           </Route>
         </Routes>
       </BrowserRouter>

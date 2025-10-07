@@ -12,15 +12,7 @@ import {
 import { FolderOpen, Check, Settings, Wifi, WifiOff, RotateCcw, X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../../store";
-import {
-  loadCycles,
-  setLoading,
-  setError,
-  setDirectoryPath,
-  selectLocalCycles,
-  selectLocalCyclesLoading,
-  selectLocalCyclesDirectoryPath,
-} from "../../store/localCyclesSlice";
+
 import {
   selectWebSocketConnected,
   selectWebSocketConnecting,
@@ -59,7 +51,6 @@ function Header() {
   const [newWsUrl, setNewWsUrl] = useState(wsUrl);
 
   // Get state from Redux
-  const localCycles = useSelector((state: RootState) => state.localCycles.cycles);
   
 
   // Load saved path from localStorage and Redux
@@ -67,7 +58,6 @@ function Header() {
     const savedPath = localStorage.getItem(LOCAL_CYCLES_PATH_KEY);
     if (savedPath) {
       setLocalCyclesPath(savedPath);
-      dispatch(setDirectoryPath(savedPath));
     }
   }, [dispatch]);
 
@@ -148,7 +138,6 @@ function Header() {
     }
 
     // Set loading state in Redux
-    dispatch(setLoading(true));
 
     try {
       // Ask user to select the directory (browser security limitation)
@@ -254,7 +243,6 @@ function Header() {
       );
 
       // Save cycles to Redux store
-      dispatch(loadCycles(cyclesFromDirectory));
 
       // Console log the actual JavaScript objects array
       console.log("=== LOADED CYCLES FROM HEADER ===");
@@ -292,13 +280,11 @@ function Header() {
         (error as any).name !== "AbortError"
       ) {
         console.error("Failed to load local cycles:", error);
-        dispatch(setError(`Failed to load cycles: ${(error as Error).message}`));
         alert(
           `Failed to load cycles from directory: ${directoryPath}\n\nError: ${(error as Error).message}`
         );
       } else {
         console.log("User cancelled directory selection");
-        dispatch(setLoading(false));
       }
       return [];
     }
@@ -494,24 +480,7 @@ const handleSaveWsConfig = () => {
           )}
         </div>
 
-        {/* Path Indicator */}
-        <div
-          className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
-            localCyclesPath
-              ? "bg-green-900/20 border-green-600/30 hover:bg-green-800/30"
-              : "bg-yellow-900/20 border-yellow-600/30 hover:bg-yellow-800/30"
-          }`}
-          onClick={() => setShowPathModal(true)}
-          title={localCyclesPath || "Click to set cycles directory"}
-        >
-          <span
-            className={`text-xs font-medium ${
-              localCyclesPath ? "text-green-300" : "text-yellow-300"
-            }`}
-          >
-            {getPathDisplayName(localCyclesPath)}
-          </span>
-        </div>
+       
       </div>
 
       <div

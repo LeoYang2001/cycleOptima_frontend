@@ -8,10 +8,9 @@ import Section from "../../components/common/Section";
 import CycleTimeLinePreview from "../../components/common/CycleTimeLinePreview";
 import PhaseBreakdown from "../../components/cycleDetail/PhaseBreakdown";
 import CycleSummary from "../../components/cycleDetail/CycleSummary";
-import { useAutoSync } from "../../hooks/useAutoSync";
 
 import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
-import { addPhaseOptimistically, deletePhaseOptimistically, updateCycleNote, updateCycleOptimistically, updateCyclePhases } from "../../store/localCyclesSlice";
+import { updateCycle } from "../../store/cycleSlice";
 
 function CycleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,15 +20,11 @@ function CycleDetail() {
 
 
   // Try to get cycle from Redux
-  const cycles = useSelector((state: RootState) => state.localCycles.cycles);
+  const cycles = useSelector((state: RootState) => state.cycles.cycles);
 
   const cycle = cycles.find(cycle => cycle.id === id);
-  const cyclesLoading = useSelector((state: RootState) => state.localCycles.loading);
-  // Set up auto-sync (disabled for manual control)
-  const { pendingCount, triggerSync } = useAutoSync({
-    enabled: false, // Disable auto-sync for manual control
-    debounceMs: 1500,
-  });
+  const cyclesLoading = useSelector((state: RootState) => state.cycles.loading);
+ 
 
   // Local UI state (non-persisted) - MUST be declared before any conditional returns
   const [cycleName, setCycleName] = useState(cycle?.displayName || "");
@@ -52,23 +47,7 @@ const [isRedirecting, setIsRedirecting] = useState(false);
   // Get WebSocket connection status from Redux
   const wsConnected = useSelector(selectWebSocketConnected);
 
-  // Manual save trigger (for save button) - defined early so useEffect can reference it
-  const handleSave = async () => {
-    try {
-      if (pendingCount === 0 || !cycle) {
-        return; // No changes to save or no cycle, do nothing
-      }
 
-      setIsSaving(true);
-      await triggerSync(cycle.id);
-
-      // Success - isSaving will be reset when pendingCount becomes 0
-    } catch (error) {
-      console.error("Save failed:", error);
-      setIsSaving(false); // Reset loading state on error
-      alert(`Failed to save cycle: ${(error as Error).message}`);
-    }
-  };
 
   // Manual run trigger (for run shortcut) - now runs directly
   const handleRun = async () => {
@@ -101,41 +80,53 @@ const executeRun = async () => {
     setIsRunning(true);
     setFlashCompleted(false);
 
-    const handleCycleRunResponse = (data: any) => {
-      console.log('Cycle run WebSocket message received:', data);
+   const handleCycleRunResponse = (data: any) => {
+  console.log('Cycle run WebSocket message received:', data);
 
-      if (data.success) {
-        console.log('Cycle run successful:', data);
-        setIsRunning(false);
-        setFlashCompleted(true);
+  if (data.success) {
+    console.log('Cycle run successful:', data);
+    setIsRunning(false);
+    setFlashCompleted(true);
 
-        setIsRedirecting(true); // <-- Set redirecting state
-
-        setTimeout(() => {
-          console.log('Navigating to monitor page with cycle data');
-          navigate("/system-monitor", {
-            state: {
-              cycleData: cycle,
-              timestamp: Date.now(),
-              autoStarted: true,
-              flashSuccess: true
-            },
-          });
-
-          setIsRedirecting(false); // <-- Reset after navigation (optional, in case you come back)
-          websocketManager.unregisterMessageHandler('cycleRun');
-        }, 1500);
-
-      } else if (!data.success) {
-        console.error('Cycle run failed:', data);
-        setIsRunning(false);
-        setFlashCompleted(false);
-        websocketManager.unregisterMessageHandler('cycleRun');
-      } else if (data.type === 'cycle-run-progress' || data.action === 'cycle-run-progress') {
-        console.log('Cycle run progress:', data);
+    // Update cycle status to "tested" in the database
+    dispatch(updateCycle({
+      id: cycle.id,
+      updates: { 
+        status: "tested",
+        tested_at: new Date().toISOString()
       }
-    };
+    }));
 
+    setIsRedirecting(true);
+
+    setTimeout(() => {
+      console.log('Navigating to monitor page with cycle data');
+      navigate("/system-monitor", {
+        state: {
+          cycleData: {
+            ...cycle,
+            status: "tested", // Include updated status in navigation state
+            tested_at: new Date().toISOString()
+          },
+          timestamp: Date.now(),
+          autoStarted: true,
+          flashSuccess: true
+        },
+      });
+
+      setIsRedirecting(false);
+      websocketManager.unregisterMessageHandler('cycleRun');
+    }, 1500);
+
+  } else if (!data.success) {
+    console.error('Cycle run failed:', data);
+    setIsRunning(false);
+    setFlashCompleted(false);
+    websocketManager.unregisterMessageHandler('cycleRun');
+  } else if (data.type === 'cycle-run-progress' || data.action === 'cycle-run-progress') {
+    console.log('Cycle run progress:', data);
+  }
+};
     websocketManager.registerMessageHandler('cycleRun', handleCycleRunResponse);
 
     const success = websocketManager.send({
@@ -247,9 +238,6 @@ const executeRun = async () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        if (pendingCount > 0) {
-          handleSave();
-        }
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "r") {
         e.preventDefault();
@@ -274,14 +262,9 @@ const executeRun = async () => {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [pendingCount, handleSave, isRunning, flashCompleted, handleRun, handleMonitor, handleDownload]);
+  }, [isRunning, flashCompleted, handleRun, handleMonitor, handleDownload]);
 
-  // Reset saving state when all changes are saved
-  useEffect(() => {
-    if (pendingCount === 0 && isSaving) {
-      setIsSaving(false);
-    }
-  }, [pendingCount, isSaving]);
+  
 
   // Check if cycle exists and redirect to home if not found (after cycles are loaded)
   useEffect(() => {
@@ -318,35 +301,52 @@ const executeRun = async () => {
   }
 
   // Update cycle name in Redux (optimistic)
-  const updateCycleName = (newName: string) => {
+const updateCycleName = async (newName: string) => {
+    if (!cycle) return;
+    
     setCycleName(newName);
-    dispatch(
-      updateCycleOptimistically({
-        ...cycle,
-        displayName: newName,
-      })
-    );
+    try {
+      await dispatch(updateCycle({
+        id: cycle.id,
+        updates: { displayName: newName }
+      })).unwrap();
+    } catch (error) {
+      console.error('Failed to update cycle name:', error);
+      // Revert local state on error
+      setCycleName(cycle.displayName);
+    }
+  };
+
+    const handleClosePhaseModal = () => {
+    setShowPhaseModal(false);
+    setNewPhaseName("");
+    setNewPhaseColor("4ADE80");
   };
 
   // Update engineer note in Redux (optimistic)
-  const updateEngineerNote = (newNote: string) => {
+ const updateEngineerNote = async (newNote: string) => {
+    if (!cycle) return;
+    
     setEngineer_note(newNote);
-    dispatch(
-      updateCycleNote({
-        cycleId: cycle.id,
-        note: newNote,
-      })
-    );
+    try {
+      await dispatch(updateCycle({
+        id: cycle.id,
+        updates: { engineer_note: newNote }
+      })).unwrap();
+    } catch (error) {
+      console.error('Failed to update engineer note:', error);
+      // Revert local state on error
+      setEngineer_note(cycle.engineer_note || "");
+    }
   };
-
   // Add phase (open modal)
   const addPhase = () => {
     setShowPhaseModal(true);
   };
 
   // Handle phase creation from modal
-  const handleCreatePhase = () => {
-    if (!newPhaseName.trim()) {
+   const handleCreatePhase = async () => {
+    if (!newPhaseName.trim() || !cycle) {
       alert("Phase name cannot be empty. Please enter a valid phase name.");
       return;
     }
@@ -359,44 +359,68 @@ const executeRun = async () => {
       components: [],
     };
 
-    dispatch(
-      addPhaseOptimistically({
-        cycleId: cycle.id,
-        phase: newPhase,
-      })
-    );
+    const updatedPhases = [...cycle.data.phases, newPhase];
 
-    // Reset modal state
-    setShowPhaseModal(false);
-    setNewPhaseName("");
-    setNewPhaseColor("4ADE80");
+    try {
+      await dispatch(updateCycle({
+        id: cycle.id,
+        updates: {
+          data: {
+            ...cycle.data,
+            phases: updatedPhases
+          }
+        }
+      })).unwrap();
+
+      // Reset modal state on success
+      setShowPhaseModal(false);
+      setNewPhaseName("");
+      setNewPhaseColor("4ADE80");
+    } catch (error) {
+      console.error('Failed to add phase:', error);
+      alert('Failed to add phase. Please try again.');
+    }
   };
 
-  // Close modal without creating phase
-  const handleClosePhaseModal = () => {
-    setShowPhaseModal(false);
-    setNewPhaseName("");
-    setNewPhaseColor("4ADE80");
-  };
+  const deletePhase = async (phaseId: string) => {
+    if (!cycle) return;
 
-  // Delete phase (optimistic update)
-  const deletePhase = (phaseId: string) => {
-    dispatch(
-      deletePhaseOptimistically({
-        cycleId: cycle.id,
-        phaseId: phaseId,
-      })
-    );
+    const updatedPhases = cycle.data.phases.filter(phase => phase.id !== phaseId);
+
+    try {
+      await dispatch(updateCycle({
+        id: cycle.id,
+        updates: {
+          data: {
+            ...cycle.data,
+            phases: updatedPhases
+          }
+        }
+      })).unwrap();
+    } catch (error) {
+      console.error('Failed to delete phase:', error);
+      alert('Failed to delete phase. Please try again.');
+    }
   };
 
   // Update phases (for drag and drop reordering)
-  const updatePhases = (newPhases: typeof cycle.data.phases) => {
-    dispatch(
-      updateCyclePhases({
-        cycleId: cycle.id,
-        phases: newPhases,
-      })
-    );
+ const updatePhases = async (newPhases: typeof cycle.data.phases) => {
+    if (!cycle) return;
+
+    try {
+      await dispatch(updateCycle({
+        id: cycle.id,
+        updates: {
+          data: {
+            ...cycle.data,
+            phases: newPhases
+          }
+        }
+      })).unwrap();
+    } catch (error) {
+      console.error('Failed to update phases:', error);
+      alert('Failed to update phase order. Please try again.');
+    }
   };
 
   // Wrapper for setPhases compatibility with existing components
@@ -524,36 +548,7 @@ const executeRun = async () => {
               </div>
             )}
 
-            {/* Save Status Indicator */}
-            {/* {isSaving ? (
-              <div className="flex items-center gap-3 bg-blue-900/20 border border-blue-600/30 rounded-lg px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-spin border border-blue-200"></div>
-                  <span className="text-blue-300 text-sm font-medium">
-                    Saving changes...
-                  </span>
-                </div>
-              </div>
-            ) : pendingCount > 0 ? (
-              <div className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                  <span className="text-yellow-300 text-sm font-medium">
-                    unsaved change{pendingCount > 1 ? "s" : ""}
-                  </span>
-                </div>
-                <span className="text-yellow-400 text-xs opacity-70">
-                  Ctrl+S
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span className="text-green-300 text-sm font-medium">
-                  All changes saved
-                </span>
-              </div>
-            )} */}
+         
           </div>
         </div>
         <div className="flex flex-row absolute left-0 top-16">
