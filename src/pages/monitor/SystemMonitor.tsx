@@ -96,6 +96,8 @@ function SystemMonitor() {
 
   const [ifStoppingCycle, setIfStoppingCycle] = useState(false);
 
+
+
   // Get phase durations for timeline rendering
   const getPhaseTimeline = () => {
     if (!cycleData?.data.phases) return [];
@@ -118,7 +120,6 @@ function SystemMonitor() {
 
   // Update the sendWebSocketCommand function
   const sendWebSocketCommand = (command: string) => {
-    console.log('send command:', command);
     if (wsConnected) {
       if (command === 'start') {
         // Start command sent - polling will begin when we receive acknowledgment
