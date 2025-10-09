@@ -159,7 +159,7 @@ function SystemMonitor() {
       'Cycle_Running',
       'Current_Phase',
       'Phase_Name',
-      'Flow_Sensor_Pin3',
+      'RPM',
       'Pressure_Sensor_Pin0',
       'Retractor_Pin7',
       'Cold_Valve2_Pin8',
@@ -310,8 +310,8 @@ function SystemMonitor() {
     // Start elapsed time counter
     setElapsedTime(0);
     counterIntervalRef.current = setInterval(() => {
-      setElapsedTime(prev => prev + 1);
-    }, 1000);
+      setElapsedTime(prev => prev + 0.5);
+    }, 500);
   };
 
   const handleStopCycle = () => {
