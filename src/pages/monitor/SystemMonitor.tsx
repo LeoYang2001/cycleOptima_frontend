@@ -19,6 +19,9 @@ const pins = [
 ];
 
 
+
+
+
 interface TelemetryData {
   cycle_running: boolean;
   current_phase: number;
@@ -72,6 +75,24 @@ interface CycleData {
 }
 
 
+interface SensorLogEntry {
+  timestamp: number;
+  elapsedSeconds: number;
+  cycle_running: boolean;
+  current_phase: number;
+  current_phase_name: string;
+  flow_sensor_pin3: number;
+  pressure_sensor_pin0?: number;
+  // Add component states
+  retractor_pin7: boolean;
+  cold_valve2_pin8: boolean;
+  hot_valve_pin9: boolean;
+  drain_pump_pin19: boolean;
+  cold_valve1_pin5: boolean;
+  cold_valve3_pin18: boolean;
+  motor_on_pin4: boolean;
+  motor_direction_pin10: boolean;
+}
 
 function SystemMonitor() {
   const location = useLocation();
@@ -96,8 +117,116 @@ function SystemMonitor() {
 
   const [ifStoppingCycle, setIfStoppingCycle] = useState(false);
 
+  const [ifRunningCycle, setIfRunningCycle] = useState(false);
+    const [sensorLog, setSensorLog] = useState<SensorLogEntry[]>([]);
 
 
+   const createLogEntry = (telemetryData: TelemetryData, elapsedTime: number): SensorLogEntry => {
+    const componentStates = {
+      retractor_pin7: pinStates[7] || false,
+      cold_valve2_pin8: pinStates[8] || false,
+      hot_valve_pin9: pinStates[9] || false,
+      drain_pump_pin19: pinStates[19] || false,
+      cold_valve1_pin5: pinStates[5] || false,
+      cold_valve3_pin18: pinStates[18] || false,
+      motor_on_pin4: pinStates[4] || false,
+      motor_direction_pin10: pinStates[10] || false,
+    };
+
+    return {
+      timestamp: Date.now(),
+      elapsedSeconds: elapsedTime,
+      cycle_running: telemetryData.cycle_running,
+      current_phase: telemetryData.current_phase,
+      current_phase_name: telemetryData.current_phase_name,
+      flow_sensor_pin3: telemetryData.sensors.flow_sensor_pin3,
+      pressure_sensor_pin0: telemetryData.sensors.pressure_sensor_pin0,
+      ...componentStates
+    };
+  };
+  
+  const downloadCSV = () => {
+    if (sensorLog.length === 0) {
+      alert('No data to download');
+      return;
+    }
+
+    // Create CSV headers
+    const headers = [
+      'Timestamp',
+      'Date_Time',
+      'Elapsed_Seconds',
+      'Cycle_Running',
+      'Current_Phase',
+      'Phase_Name',
+      'Flow_Sensor_Pin3',
+      'Pressure_Sensor_Pin0',
+      'Retractor_Pin7',
+      'Cold_Valve2_Pin8',
+      'Hot_Valve_Pin9',
+      'Drain_Pump_Pin19',
+      'Cold_Valve1_Pin5',
+      'Cold_Valve3_Pin18',
+      'Motor_On_Pin4',
+      'Motor_Direction_Pin10'
+    ].join(',');
+
+    // Create CSV rows
+    const csvRows = sensorLog.map(entry => [
+      entry.timestamp,
+      new Date(entry.timestamp).toISOString(),
+      entry.elapsedSeconds,
+      entry.cycle_running,
+      entry.current_phase,
+      `"${entry.current_phase_name}"`, // Wrap in quotes to handle spaces
+      entry.flow_sensor_pin3,
+      entry.pressure_sensor_pin0 || 0,
+      entry.retractor_pin7,
+      entry.cold_valve2_pin8,
+      entry.hot_valve_pin9,
+      entry.drain_pump_pin19,
+      entry.cold_valve1_pin5,
+      entry.cold_valve3_pin18,
+      entry.motor_on_pin4,
+      entry.motor_direction_pin10
+    ].join(','));
+
+    // Combine headers and rows
+    const csvContent = [headers, ...csvRows].join('\n');
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    
+    // Generate filename with cycle name and timestamp
+    const cycleName = cycleData?.displayName || 'Cycle';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `${cycleName}_Test_${timestamp}.csv`;
+    
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const promptCSVDownload = () => {
+    if (sensorLog.length === 0) {
+      return;
+    }
+
+    const userConfirmed = window.confirm(
+      `Test completed! You have ${sensorLog.length} data points logged.\n\nWould you like to download the test data as a CSV file?`
+    );
+
+    if (userConfirmed) {
+      downloadCSV();
+    }
+    setSensorLog([]); // Clear log after prompt
+  };
   // Get phase durations for timeline rendering
   const getPhaseTimeline = () => {
     if (!cycleData?.data.phases) return [];
@@ -175,7 +304,9 @@ function SystemMonitor() {
 
     sendWebSocketCommand("start");
     startPolling();
+      setIfRunningCycle(true)
 
+    
     // Start elapsed time counter
     setElapsedTime(0);
     counterIntervalRef.current = setInterval(() => {
@@ -186,6 +317,7 @@ function SystemMonitor() {
   const handleStopCycle = () => {
     sendWebSocketCommand("stop");
 
+      setIfRunningCycle(false);
     // Stop elapsed time counter
     if (counterIntervalRef.current) {
       clearInterval(counterIntervalRef.current);
@@ -202,12 +334,15 @@ function SystemMonitor() {
         setIfStoppingCycle(false);
       }, 1500);
     }
+    promptCSVDownload();
   }
 
   // Update the startPolling function
   const startPolling = () => {
+    
     if (wsConnected) {
       console.log('Starting telemetry polling...');
+
       const interval = setInterval(() => {
         websocketManager.send('get_telemetry');
         if (!pollingInterval) {
@@ -225,13 +360,7 @@ function SystemMonitor() {
     return (telemetryData.current_phase / telemetryData.total_phases) * 100;
   };
 
-  // Display cycle information if available
-  useEffect(() => {
-    if (cycleData && timestamp) {
-      console.log("Received cycle data for monitoring:", cycleData);
-      console.log("Flash completed at:", new Date(timestamp));
-    }
-  }, [cycleData, timestamp]);
+
 
   // Update the useEffect hook to handle WebSocket messages
   useEffect(() => {
@@ -296,6 +425,13 @@ function SystemMonitor() {
   }, []);
 
   const phaseTimeline = getPhaseTimeline();
+
+  useEffect(() => {
+    if(telemetryData?.cycle_running){
+      console.log(createLogEntry(telemetryData!, elapsedTime));
+      setSensorLog(prev => [...prev, createLogEntry(telemetryData!, elapsedTime)]);
+    }
+  }, [ifRunningCycle, elapsedTime]);
 
   return (
     <div style={{ 
