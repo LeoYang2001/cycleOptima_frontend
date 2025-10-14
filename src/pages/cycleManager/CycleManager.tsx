@@ -226,20 +226,46 @@ function CycleManager() {
       const queryEmbedding = await getEmbedding(inputVal.trim());
       
       // Perform semantic search on cycles
-      const searchableFields = allCycles.map(cycle => ({
-        id: cycle.id,
-        searchableText: [
-          cycle.displayName || '',
-          cycle.summary || '',
-          cycle.engineer_note || '',
-          cycle.status || '',
-          // Include phase names and component labels for deeper search
-          ...(cycle.data?.phases?.map(phase => [
-            phase.name || '',
-            ...(phase.components?.map(comp => comp.label || '') || [])
-          ]).flat() || [])
-        ].filter(Boolean).join(' ')
-      }));
+      interface SearchableField {
+        id: string;
+        searchableText: string;
+      }
+
+      interface CycleComponent {
+        id?: string;
+        label?: string;
+        start?: number;
+        compId?: string;
+        duration?: number;
+        motorConfig?: unknown | null;
+      }
+
+      interface CyclePhase {
+        id?: string;
+        name?: string;
+        color?: string;
+        startTime?: number;
+        components?: CycleComponent[];
+      }
+
+      const searchableFields: SearchableField[] = allCycles.map(
+        (cycle: Cycle & { isLocal?: boolean }) => ({
+          id: cycle.id,
+          searchableText: [
+        cycle.displayName || "",
+        cycle.summary || "",
+        cycle.engineer_note || "",
+        cycle.status || "",
+        // Include phase names and component labels for deeper search
+        ...(
+          cycle.data?.phases?.map((phase: CyclePhase) => [
+            phase.name || "",
+            ...(phase.components?.map((comp: CycleComponent) => comp.label || "") || []),
+          ]).flat() || []
+        ),
+          ].filter(Boolean).join(" "),
+        })
+      );
 
       // Get semantic search results with similarity threshold
       const sortedIds = getSemanticSearchResults(

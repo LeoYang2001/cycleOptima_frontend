@@ -225,7 +225,7 @@ function ComponentEditor({
   }; // Add keyboard shortcut for saving (Ctrl+S)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
         e.preventDefault();
         if (hasChanges) {
           handleSaveChanges();
@@ -275,7 +275,7 @@ function ComponentEditor({
                   Unsaved changes
                 </span>
               </div>
-              <span className="text-yellow-400 text-xs opacity-70">Ctrl+S</span>
+              <span className="text-yellow-400 text-xs opacity-70">Ctrl+C</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
