@@ -40,10 +40,7 @@ function SensorTriggerModal({
   const getSensorUnit = (sensorType: string): string => {
     const units: Record<string, string> = {
       RPM: "RPM",
-      Temperature: "°C",
-      Pressure: "bar",
-      Flow: "L/min",
-      Level: "%",
+      Pressure: "Hz",
     };
     return units[sensorType] || "";
   };
