@@ -11,7 +11,7 @@ interface SensorTriggerModalProps {
 
 // Hardcoded mapping of sensor types to pin numbers
 const SENSOR_PIN_MAP: Record<string, number> = {
-  RPM: 2,
+  RPM: 1,
   Pressure: 3,
 };
 
