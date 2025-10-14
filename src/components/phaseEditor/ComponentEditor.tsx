@@ -223,20 +223,7 @@ function ComponentEditor({
     //   // Call onClose callback if provided to close the modal after saving
     // }, 10000);
   }; // Add keyboard shortcut for saving (Ctrl+S)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
-        e.preventDefault();
-        if (hasChanges) {
-          handleSaveChanges();
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [hasChanges, handleSaveChanges]);
-
+  
   return (
     <div className=" w-full h-full  flex flex-col">
       <header
@@ -268,14 +255,14 @@ function ComponentEditor({
         {/* Changes indicator and save button */}
         <div className="flex items-center gap-4 ml-auto">
           {hasChanges ? (
-            <div className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
+            <div onClick={handleSaveChanges} className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
                 <span className="text-yellow-300 text-sm font-medium">
                   Unsaved changes
                 </span>
               </div>
-              <span className="text-yellow-400 text-xs opacity-70">Ctrl+C</span>
+              <span className="text-yellow-400 text-xs opacity-70">Click</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">

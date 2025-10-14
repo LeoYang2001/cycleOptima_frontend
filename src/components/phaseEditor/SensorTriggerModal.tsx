@@ -9,6 +9,12 @@ interface SensorTriggerModalProps {
   currentTrigger?: SensorTrigger | null;
 }
 
+// Hardcoded mapping of sensor types to pin numbers
+const SENSOR_PIN_MAP: Record<string, number> = {
+  RPM: 2,
+  Pressure: 3,
+};
+
 function SensorTriggerModal({
   isOpen,
   onClose,
@@ -17,8 +23,10 @@ function SensorTriggerModal({
 }: SensorTriggerModalProps) {
   const [enabled, setEnabled] = useState(!!currentTrigger);
   const [type, setType] = useState(currentTrigger?.type || "RPM");
-  const [pinNumber, setPinNumber] = useState(currentTrigger?.pinNumber || 3);
   const [threshold, setThreshold] = useState(currentTrigger?.threshold || 400);
+
+  // Get pin number automatically based on sensor type
+  const pinNumber = SENSOR_PIN_MAP[type];
 
   const handleSave = () => {
     if (enabled) {
@@ -27,6 +35,17 @@ function SensorTriggerModal({
       onSave(null);
     }
     onClose();
+  };
+
+  const getSensorUnit = (sensorType: string): string => {
+    const units: Record<string, string> = {
+      RPM: "RPM",
+      Temperature: "°C",
+      Pressure: "bar",
+      Flow: "L/min",
+      Level: "%",
+    };
+    return units[sensorType] || "";
   };
 
   if (!isOpen) return null;
@@ -40,7 +59,7 @@ function SensorTriggerModal({
           </h3>
           <div
             onClick={onClose}
-            className="text-gray-400 hover:text-white"
+            className="text-gray-400 hover:text-white cursor-pointer"
           >
             <X size={20} />
           </div>
@@ -71,50 +90,44 @@ function SensorTriggerModal({
                 <select
                   value={type}
                   onChange={(e) => setType(e.target.value)}
-                  className="w-full h-10 bg-[#18181b] border border-gray-600 text-white p-2 rounded"
+                  className="w-full h-10 bg-[#18181b] border border-gray-600 text-white p-2 rounded focus:outline-none focus:border-blue-500"
                 >
-                  <option value="RPM">RPM</option>
-                  <option value="Temperature">Temperature</option>
-                  <option value="Pressure">Pressure</option>
-                  <option value="Flow">Flow</option>
-                  <option value="Level">Level</option>
+                  <option value="RPM">RPM Sensor</option>
+                  <option value="Pressure">Pressure Sensor</option>
                 </select>
-              </div>
 
-              {/* Pin Number */}
-              <div>
-                <label className="text-white text-sm font-medium mb-2 block">
-                  Pin Number
-                </label>
-                <input
-                  type="number"
-                  value={pinNumber}
-                  onChange={(e) => setPinNumber(Number(e.target.value))}
-                  className="w-full h-10 bg-[#18181b] border border-gray-600 text-white p-2 rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="Enter pin number"
-                  min="0"
-                  max="39"
-                />
+                {/* Show pin number as read-only info */}
+                <div className="text-gray-400 text-xs mt-1">Pin: {pinNumber}</div>
               </div>
 
               {/* Threshold */}
               <div>
                 <label className="text-white text-sm font-medium mb-2 block">
-                  Threshold Value
+                  Threshold Value ({getSensorUnit(type)})
                 </label>
                 <input
                   type="number"
                   value={threshold}
                   onChange={(e) => setThreshold(Number(e.target.value))}
-                  className="w-full h-10 bg-[#18181b] border border-gray-600 text-white p-2 rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="Enter threshold value"
+                  className="w-full h-10 bg-[#18181b] border border-gray-600 text-white p-2 rounded focus:outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder={`Enter threshold value in ${getSensorUnit(type)}`}
                   min="0"
                 />
               </div>
 
               {/* Help Text */}
-              <div className="text-gray-400 text-xs">
-                The phase will advance when the sensor reading {type === "RPM" ? "reaches" : "exceeds"} the threshold value.
+              <div className="bg-gray-800/50 border border-gray-700 rounded p-3">
+                <div className="text-gray-300 text-xs">
+                  <strong>Configuration:</strong>
+                  <br />
+                  • Sensor: {type} (Pin {pinNumber})
+                  <br />
+                  • Trigger: When reading{" "}
+                  {type === "RPM" ? "reaches" : "exceeds"} {threshold}{" "}
+                  {getSensorUnit(type)}
+                  <br />
+                  • Action: Advance to next phase
+                </div>
               </div>
             </>
           )}
@@ -124,13 +137,13 @@ function SensorTriggerModal({
         <div className="flex justify-end gap-3 mt-6">
           <div
             onClick={onClose}
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors cursor-pointer"
           >
             Cancel
           </div>
           <div
             onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors cursor-pointer"
           >
             Save
           </div>

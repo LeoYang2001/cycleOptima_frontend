@@ -110,17 +110,8 @@ function PhaseEditor() {
       JSON.stringify(components) !== JSON.stringify(phase?.components || []) ||
       JSON.stringify(sensorTrigger) !== JSON.stringify(phase?.sensorTrigger || null);
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        if (hasChanges) {
-          handleSaveChanges();
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+ 
+    
   }, [phaseName, startTime, components, sensorTrigger, phase]);
 
   // ✅ NOW HANDLE CONDITIONAL RETURNS AFTER ALL HOOKS
@@ -369,7 +360,7 @@ function PhaseEditor() {
 
           <div className="flex items-center gap-4">
             {hasChanges ? (
-              <div className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
+              <div onClick={handleSaveChanges} className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
                   <span className="text-yellow-300 text-sm font-medium">
@@ -377,7 +368,7 @@ function PhaseEditor() {
                   </span>
                 </div>
                 <span className="text-yellow-400 text-xs opacity-70">
-                  Ctrl+S
+                  Click
                 </span>
               </div>
             ) : (

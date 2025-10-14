@@ -92,6 +92,15 @@ function PhaseEditorLocal() {
     }
   }, [cycle, phaseId, viewMode]);
 
+  useEffect(() => {
+      if (selectedComponent) {
+        setShowModal(true);
+      } else {
+        setShowModal(false);
+      }
+    }, [selectedComponent]);
+  
+
   const phase = cycle?.data.phases.find((p: any) => p.id === phaseId);
 
   
@@ -132,20 +141,7 @@ function PhaseEditorLocal() {
   };
 
   // Handle editor save - add keyboard shortcut support
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (hasChanges && viewMode === "editor") {
-          handleSaveChanges();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasChanges, viewMode]);
-
+ 
   // Handle editor save
   const handleSaveChanges = () => {
     if (!cycle || !phase) {
@@ -348,7 +344,7 @@ const handleDragEnd = (event: DragEndEvent) => {
               Phase Editor (Local)
             </h1>
             <p className="text-gray-400 text-sm">
-              Configure components and timing for "{phase?.name || "Unknown Phase"}" - Offline Mode
+              Configure components and timing for "{phase?.name || "Unknown Phase"}" - Offline Mode - {JSON.stringify(selectedComponent)}
             </p>
           </div>
         </div>
@@ -361,12 +357,12 @@ const handleDragEnd = (event: DragEndEvent) => {
           {/* Changes indicator / Save button */}
           {viewMode === "editor" ? (
             hasChanges ? (
-              <div className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
+              <div onClick={handleSaveChanges} className="flex items-center gap-3 bg-yellow-900/20 border border-yellow-600/30 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
                   <span className="text-yellow-300 text-sm font-medium">Unsaved changes</span>
                 </div>
-                <span className="text-yellow-400 text-xs opacity-70">Ctrl+S</span>
+                <span className="text-yellow-400 text-xs opacity-70">Click</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
