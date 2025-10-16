@@ -25,6 +25,8 @@ function PhaseBreakdown({ Phases, cycle, deletePhase }: PhaseBreakdownProps) {
     
     const { type, pinNumber, threshold } = phase.sensorTrigger;
     
+
+   
     const sensorConfig = {
       RPM: { 
         icon: Gauge, 
@@ -36,7 +38,7 @@ function PhaseBreakdown({ Phases, cycle, deletePhase }: PhaseBreakdownProps) {
       Pressure: { 
         icon: Gauge, 
         color: '#3b82f6', 
-        unit: 'bar',
+        unit: 'Hz',
         bgColor: '#3b82f6/20',
         borderColor: '#3b82f6/30'
       },
@@ -110,7 +112,7 @@ function PhaseBreakdown({ Phases, cycle, deletePhase }: PhaseBreakdownProps) {
                         style={{ color: sensorTriggerInfo.color }}
                         className="text-xs font-medium"
                       >
-                        {phase.sensorTrigger?.type}
+                        {sensorTriggerInfo.unit}
                       </span>
                     </div>
                   </div>

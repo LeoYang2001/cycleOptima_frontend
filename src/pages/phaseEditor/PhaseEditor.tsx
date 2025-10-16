@@ -372,7 +372,9 @@ function PhaseEditor() {
                 </span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
+              <div onClick={()=>{
+                setShowSensorModal(true);
+              }}  className="flex items-center gap-2 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                 <span className="text-green-300 text-sm font-medium">
                   All changes saved
@@ -424,7 +426,7 @@ function PhaseEditor() {
         />
       </Modal>
 
-      <SensorTriggerModal
+       <SensorTriggerModal
         isOpen={showSensorModal}
         onClose={() => setShowSensorModal(false)}
         onSave={handleFinalSave}

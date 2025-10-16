@@ -14,3 +14,11 @@ export type Phase = {
   color: string; // e.g. "#4ADE80"
   sensorTrigger?: SensorTrigger; // Optional sensor trigger configuration
 };
+
+
+
+export interface MotorStep {
+  stepTime: number;
+  pauseTime: number;
+  direction: string;
+}

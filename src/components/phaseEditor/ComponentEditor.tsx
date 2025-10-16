@@ -5,6 +5,9 @@ import LivePreviewComponent from "../componentEditor/LivePreviewComponent";
 import Dropdown from "../common/Dropdown";
 import { Trash2 } from "lucide-react";
 import Button from "../common/Button";
+import { FileCode } from "lucide-react";
+import JsonEditorModal from "./JsonEditorModal";
+import type { MotorStep } from "../../types/common/Phase";
 
 interface ComponentEditorProps {
   component?: CycleComponent | null;
@@ -22,6 +25,7 @@ function ComponentEditor({
   const [start, setStart] = useState(component?.start || 0);
   const [duration, setDuration] = useState(component?.duration || 0);
   const [isSaving, setIsSaving] = useState(false);
+  const [showJsonEditor, setShowJsonEditor] = useState(false);
 
   // Motor configuration states
   const [motorRunningStyle, setMotorRunningStyle] = useState(
@@ -86,6 +90,11 @@ function ComponentEditor({
     );
   };
 
+  const handleJsonSave = (newSteps: MotorStep[]) => {
+  setCustomSteps(newSteps);
+};
+
+
   // Update local state when component changes
   useEffect(() => {
     if (component) {
@@ -145,6 +154,8 @@ function ComponentEditor({
       </div>
     );
   }
+
+  
 
   const iconStyle = getStyle(component.compId);
 
@@ -419,7 +430,7 @@ function ComponentEditor({
           </div>
         )}
         {component.compId.startsWith("Motor") && (
-          <div className="flex-1 w-full  gap-8 mt-4">
+          <div className="flex-1 w-full  gap-8 mt-4   ">
             <span className="text-lg font-semibold text-white mb-4 block">
               Motor Configuration
             </span>
@@ -579,12 +590,21 @@ function ComponentEditor({
 
             {/* Custom Pattern Configuration */}
             {motorRunningStyle === "Custom Pattern" && (
-              <div className="space-y-4">
+              <div className="space-y-4 ">
                 <div className="flex justify-between items-center">
                   <span className="text-white text-sm font-medium">
                     Custom Steps
                   </span>
-                  <Button func={addCustomStep} label="Add Step" />
+                  <div className="flex gap-2">
+                    <div
+                      onClick={() => setShowJsonEditor(true)}
+                      className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+                    >
+                      <FileCode size={16} />
+                      Edit JSON
+                    </div>
+                    <Button func={addCustomStep} label="Add Step" />
+                  </div>
                 </div>
                 <div className="space-y-3 max-h-60 overflow-y-auto">
                   {customSteps.map((step, index) => (
@@ -594,8 +614,17 @@ function ComponentEditor({
                         backgroundColor: "#27272a",
                         borderRadius: 8,
                       }}
-                      className="flex items-center flex-row  gap-3  p-3 bg-gray-800 rounded"
+                      className="flex items-center flex-row relative  gap-3  px-12 p-3 bg-gray-800 rounded"
                     >
+                      {/* add index number */}
+{/* Step Index Number - Badge Style */}
+<div style={{
+  borderRadius: 8,
+}} className="flex-shrink-0  p-1 absolute left-0 top-0 ">
+  <span className="text-blue-400 text-sm font-semibold">
+    {index + 1}
+  </span>
+</div>
                       <div className="flex-1 grid grid-cols-3 gap-3">
                         <div>
                           <label className="text-gray-300 text-xs">
@@ -688,6 +717,15 @@ function ComponentEditor({
             }}
           />
         )}
+
+        {/* JSON Editor Modal */}
+        <JsonEditorModal
+          isOpen={showJsonEditor}
+          onClose={() => setShowJsonEditor(false)}
+          onSave={handleJsonSave}
+          initialSteps={customSteps}
+          componentLabel={label || component.label}
+        />
       </section>
     </div>
   );

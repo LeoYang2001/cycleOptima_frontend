@@ -377,6 +377,106 @@ function CycleManager() {
     }
   };
 
+  // Handler for copying a cycle
+  const handleCopyCycle = async (originalCycle: Cycle & { isLocal?: boolean }) => {
+    const newCycleName = window.prompt(
+      `Enter a name for the copied cycle:`,
+      `${originalCycle.displayName} - Copy`
+    );
+
+    if (!newCycleName || !newCycleName.trim()) {
+      return; // User cancelled or entered empty name
+    }
+
+    const trimmedName = newCycleName.trim();
+
+    // Check for duplicate cycle names
+    const isDuplicate = allCycles.some(
+      (cycle) => cycle.displayName?.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (isDuplicate) {
+      alert(
+        `A cycle with the name "${trimmedName}" already exists. Please choose a different name.`
+      );
+      return;
+    }
+
+    try {
+      // Create new cycle data with copied JSON structure but new ID and name
+      const newCycleData = {
+        displayName: trimmedName,
+        status: "draft" as const,
+        data: JSON.parse(JSON.stringify(originalCycle.data)), // Deep copy the data
+        engineer_note: originalCycle.engineer_note || "",
+        summary: originalCycle.summary || ""
+      };
+
+      // If original cycle is local or server is unavailable, create locally
+      if (originalCycle.isLocal) {
+        const localCycle: LocalCycle = {
+          id: `local-cycle-${Date.now()}`,
+          ...newCycleData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        // Save to localStorage
+        const existingCycles = JSON.parse(localStorage.getItem('localCycles') || '[]');
+        existingCycles.push(localCycle);
+        localStorage.setItem('localCycles', JSON.stringify(existingCycles));
+        setLocalCycles(existingCycles);
+
+        alert(`Cycle "${trimmedName}" copied successfully as a local cycle!`);
+        
+        // Navigate to the copied cycle
+        // navigate(`/cycle-local/${localCycle.id}`, { 
+        //   state: { cycle: localCycle, isNew: true, isLocal: true } 
+        // });
+      } else {
+        // Try to create on server first
+        try {
+          const resultAction = await dispatch(createCycle(newCycleData));
+
+          if (createCycle.fulfilled.match(resultAction)) {
+            alert(`Cycle "${trimmedName}" copied successfully!`);
+            
+            // Navigate to the copied cycle
+            // navigate(`/cycle/${resultAction.payload.id}`, { 
+            //   state: { cycle: resultAction.payload, isNew: true } 
+            // });
+          } else {
+            throw new Error('Failed to create cycle on server');
+          }
+        } catch (error) {
+          console.error("Failed to copy cycle to server:", error);
+          
+          // Fallback to local creation
+          const localCycle: LocalCycle = {
+            id: `local-cycle-${Date.now()}`,
+            ...newCycleData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+
+          const existingCycles = JSON.parse(localStorage.getItem('localCycles') || '[]');
+          existingCycles.push(localCycle);
+          localStorage.setItem('localCycles', JSON.stringify(existingCycles));
+          setLocalCycles(existingCycles);
+
+          alert(`Server unavailable. Cycle "${trimmedName}" copied as a local cycle!`);
+          
+          // navigate(`/cycle-local/${localCycle.id}`, { 
+          //   state: { cycle: localCycle, isNew: true, isLocal: true } 
+          // });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to copy cycle:', error);
+      alert('Failed to copy cycle. Please try again.');
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header with source indicator */}
@@ -472,7 +572,13 @@ function CycleManager() {
         ) : (
           <div className="grid grid-cols-5 grid-rows-3 gap-4 h-full">
             {pagedCycles.map((cycle) => (
-              <CycleFile cycle={cycle} key={cycle.id} />
+              <div onContextMenu={(e)=>{
+                e.stopPropagation();
+                e.preventDefault();
+                handleCopyCycle(cycle)
+              }} key={cycle.id} >
+                <CycleFile cycle={cycle} key={cycle.id} />
+                </div>
             ))}
             {Array.from({
               length: CYCLES_PER_PAGE - pagedCycles.length,

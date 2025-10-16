@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import type { SensorTrigger } from "../../types/common/Phase";
 
@@ -25,6 +25,17 @@ function SensorTriggerModal({
   const [type, setType] = useState(currentTrigger?.type || "RPM");
   const [threshold, setThreshold] = useState(currentTrigger?.threshold || 400);
 
+  // Add useEffect to sync state with currentTrigger prop
+  useEffect(() => {
+    if (isOpen) {
+      setEnabled(!!currentTrigger);
+      setType(currentTrigger?.type || "RPM");
+      setThreshold(currentTrigger?.threshold || 400);
+    }
+  }, [currentTrigger, isOpen]);
+
+
+
   // Get pin number automatically based on sensor type
   const pinNumber = SENSOR_PIN_MAP[type];
 
@@ -48,7 +59,7 @@ function SensorTriggerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div  className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-[#1a1a1a] border border-gray-600 rounded-lg p-6 w-96">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-white">

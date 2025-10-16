@@ -331,7 +331,7 @@ const setPhases = (
           </div>
 
           {/* Save to Local button */}
-          <div
+          {/* <div
             onClick={saveStatus === 'saving' ? undefined : handleSaveToLocal}
             className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-colors ${
               saveStatus === 'saved'
@@ -344,7 +344,7 @@ const setPhases = (
           >
             <Save size={16} className={saveStatus === 'saving' ? 'animate-spin' : ''} />
             {saveStatus === 'saved' ? 'Saved!' : saveStatus === 'saving' ? 'Saving...' : 'Save Local'}
-          </div>
+          </div> */}
 
           {/* JSON Editor button */}
           <div
