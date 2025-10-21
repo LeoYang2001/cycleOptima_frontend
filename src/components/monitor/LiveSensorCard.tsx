@@ -35,9 +35,12 @@ const LiveSensorCard: React.FC<LiveSensorCardProps> = ({ telemetryData, onCardCl
 
   // Get realistic pressure value (0-5 bar range)
   const getPressureValue = () => {
+    
     // Use telemetryData.sensors.pressure_sensor_pin0 if available, otherwise fallback to simulated value
     const pressure =
-      telemetryData?.sensors?.pressure_sensor_pin0 !== 0
+      telemetryData?.sensors?.pressure_sensor_pin0 !== undefined
+        ? telemetryData.sensors.pressure_sensor_pin0
+        : 0; // Simulated default pressure
     return Number(pressure).toFixed(1);
   };
 
@@ -124,7 +127,7 @@ const LiveSensorCard: React.FC<LiveSensorCardProps> = ({ telemetryData, onCardCl
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: "20px", fontWeight: "700" }}>{getPressureValue()}</div>
-            <div style={{ fontSize: "12px", color: "#64748b" }}>bar</div>
+            <div style={{ fontSize: "12px", color: "#64748b" }}>Hz</div>
           </div>
         </div>
 

@@ -41,10 +41,8 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
 
       const newDataPoint: SensorDataPoint = {
         timestamp: Date.now(),
-        rpm: rawRPM,
-        pressure: rawPressure !== undefined
-          ? rawPressure
-          : 0, 
+        rpm: typeof rawRPM === 'number' ? rawRPM : 0, // Ensure it's a number
+        pressure: typeof rawPressure === 'number' ? rawPressure : 0, // Ensure it's a number
         temperature: 39.7 + Math.sin(Date.now() / 8000) * 2,
         waterLevel: 74.5 + Math.cos(Date.now() / 6000) * 10,
       };
@@ -106,15 +104,15 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
     const sensors = {
       rpm: { 
         color: '#10b981', 
-        data: sensorHistory.map(d => d.rpm), // Remove the scaling here since it's already scaled
+        data: sensorHistory.map(d => d.rpm),
         min: 0,
-        max: 800 // Set max to 800 RPM
+        max: 800
       },
       pressure: { 
         color: '#3b82f6', 
         data: sensorHistory.map(d => d.pressure),
-        min: 27000,
-        max: 32000
+        min: 23000, // Changed from 27000 to 23000
+        max: 27500  // Changed from 32000 to 27500
       },
       temperature: { 
         color: '#ef4444', 
@@ -246,11 +244,12 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
   const getLatestValues = () => {
     const latest = sensorHistory[sensorHistory.length - 1];
     if (!latest) return null;
+    
     return {
-      rpm: latest.rpm, // Changed from flowRate to rpm
-      pressure: latest.pressure,
-      temperature: latest.temperature,
-      waterLevel: latest.waterLevel
+      rpm: latest.rpm || 0, // Provide default value
+      pressure: latest.pressure || 0, // Provide default value
+      temperature: latest.temperature || 0, // Provide default value
+      waterLevel: latest.waterLevel || 0 // Provide default value
     };
   };
 
@@ -438,7 +437,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
                       <span style={{ fontSize: '14px', color: '#94a3b8' }}>RPM</span> {/* Changed from Flow Rate to RPM */}
                     </div>
                     <div style={{ fontSize: '24px', fontWeight: '700', color: '#10b981' }}>
-                      {latestValues.rpm.toFixed(1)} {/* Changed from flowRate to rpm */}
+                      {(latestValues.rpm || 0).toFixed(1)} {/* Add null coalescing operator */}
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>RPM</div> {/* Changed from pulses/sec to RPM */}
                   </div>
@@ -454,7 +453,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
                       <span style={{ fontSize: '14px', color: '#94a3b8' }}>Pressure</span>
                     </div>
                     <div style={{ fontSize: '24px', fontWeight: '700', color: '#3b82f6' }}>
-                      {latestValues.pressure.toFixed(1)}
+                      {(latestValues.pressure || 0).toFixed(1)} {/* Add null coalescing operator */}
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>bar</div>
                   </div>
@@ -470,7 +469,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
                       <span style={{ fontSize: '14px', color: '#94a3b8' }}>Temperature</span>
                     </div>
                     <div style={{ fontSize: '24px', fontWeight: '700', color: '#ef4444' }}>
-                      {latestValues.temperature.toFixed(1)}
+                      {(latestValues.temperature || 0).toFixed(1)} {/* Add null coalescing operator */}
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>°C</div>
                   </div>
@@ -486,7 +485,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
                       <span style={{ fontSize: '14px', color: '#94a3b8' }}>Water Level</span>
                     </div>
                     <div style={{ fontSize: '24px', fontWeight: '700', color: '#06b6d4' }}>
-                      {latestValues.waterLevel.toFixed(1)}
+                      {(latestValues.waterLevel || 0).toFixed(1)} {/* Add null coalescing operator */}
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748b' }}>%</div>
                   </div>
@@ -518,7 +517,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
                   <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.5' }}>
                     <div>Duration: {Math.floor((Date.now() - sensorHistory[0].timestamp) / 1000)}s</div>
                     <div>Updates: {sensorHistory.length}</div>
-                    <div>Avg RPM: {(sensorHistory.reduce((sum, d) => sum + d.rpm, 0) / sensorHistory.length).toFixed(1)} RPM</div> {/* Changed from Flow to RPM and p/s to RPM */}
+                    <div>Avg RPM: {(sensorHistory.reduce((sum, d) => sum + (d.rpm || 0), 0) / sensorHistory.length).toFixed(1)} RPM</div>
                   </div>
                 </div>
               )}
