@@ -13,8 +13,8 @@ interface TelemetryData {
     active: boolean;
   }>;
   sensors: {
-    flow_sensor_pin3: number;
-    pressure_sensor_pin0?: number; // Optional, for backward compatibility
+    rpm_sensor: number;
+    pressure_sensor?: number; // Optional, for backward compatibility
   };
   timestamp: number;
 }
@@ -27,7 +27,7 @@ interface LiveSensorCardProps {
 const LiveSensorCard: React.FC<LiveSensorCardProps> = ({ telemetryData, onCardClick }) => {
   // Convert the raw sensor value to realistic RPM (assuming raw value is 0-100, convert to 0-800)
   const getRPMValue = () => {
-    const rawValue = telemetryData?.sensors?.flow_sensor_pin3 || 0;
+    const rawValue = telemetryData?.sensors?.rpm_sensor || 0;
     // Scale from 0-100 to 0-800 RPM range
     const scaledRPM = rawValue
     return scaledRPM.toFixed(0); // Round to whole number for RPM
@@ -36,27 +36,15 @@ const LiveSensorCard: React.FC<LiveSensorCardProps> = ({ telemetryData, onCardCl
   // Get realistic pressure value (0-5 bar range)
   const getPressureValue = () => {
     
-    // Use telemetryData.sensors.pressure_sensor_pin0 if available, otherwise fallback to simulated value
+    // Use telemetryData.sensors.pressure_sensor if available, otherwise fallback to simulated value
     const pressure =
-      telemetryData?.sensors?.pressure_sensor_pin0 !== undefined
-        ? telemetryData.sensors.pressure_sensor_pin0
+      telemetryData?.sensors?.pressure_sensor !== undefined
+        ? telemetryData.sensors.pressure_sensor
         : 0; // Simulated default pressure
     return Number(pressure).toFixed(1);
   };
 
-  // Get realistic temperature value (35-45°C range)
-  const getTemperatureValue = () => {
-    const baseTemp = 39.7;
-    const variation = Math.sin(Date.now() / 8000) * 3; // ±3°C variation
-    return (baseTemp + variation).toFixed(1);
-  };
-
-  // Get realistic water level (60-90% range)
-  const getWaterLevel = () => {
-    const baseLevel = 75;
-    const variation = Math.cos(Date.now() / 6000) * 15; // ±15% variation
-    return Math.max(0, Math.min(100, baseLevel + variation)).toFixed(1);
-  };
+ 
 
   return (
     <div 
@@ -160,59 +148,9 @@ const LiveSensorCard: React.FC<LiveSensorCardProps> = ({ telemetryData, onCardCl
           </div>
         </div>
 
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "space-between", 
-          alignItems: "center" 
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{ 
-              width: "32px", 
-              height: "32px", 
-              borderRadius: "6px", 
-              background: "#ef4444",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "14px",
-              fontWeight: "600"
-            }}>
-              T
-            </div>
-            <span style={{ fontSize: "14px" }}>Temperature</span>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "20px", fontWeight: "700" }}>{getTemperatureValue()}</div>
-            <div style={{ fontSize: "12px", color: "#64748b" }}>°C</div>
-          </div>
-        </div>
+       
 
-        <div style={{ 
-          display: "flex", 
-          justifyContent: "space-between", 
-          alignItems: "center" 
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{ 
-              width: "32px", 
-              height: "32px", 
-              borderRadius: "6px", 
-              background: "#06b6d4",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "14px",
-              fontWeight: "600"
-            }}>
-              W
-            </div>
-            <span style={{ fontSize: "14px" }}>Water Level</span>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: "20px", fontWeight: "700" }}>{getWaterLevel()}</div>
-            <div style={{ fontSize: "12px", color: "#64748b" }}>%</div>
-          </div>
-        </div>
+        
       </div>
     </div>
   );

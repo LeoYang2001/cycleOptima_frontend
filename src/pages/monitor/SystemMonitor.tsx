@@ -34,8 +34,8 @@ interface TelemetryData {
     active: boolean;
   }>;
   sensors: {
-    flow_sensor_pin3: number;
-    pressure_sensor_pin0?: number; // <-- Add this line
+    rpm_sensor: number;
+    pressure_sensor?: number; // <-- Add this line
   };
   timestamp: number;
 }
@@ -81,8 +81,8 @@ interface SensorLogEntry {
   cycle_running: boolean;
   current_phase: number;
   current_phase_name: string;
-  flow_sensor_pin3: number;
-  pressure_sensor_pin0?: number;
+  rpm_sensor: number;
+  pressure_sensor?: number;
   // Add component states
   retractor_pin7: boolean;
   cold_valve2_pin8: boolean;
@@ -139,8 +139,8 @@ function SystemMonitor() {
       cycle_running: telemetryData.cycle_running,
       current_phase: telemetryData.current_phase,
       current_phase_name: telemetryData.current_phase_name,
-      flow_sensor_pin3: telemetryData.sensors.flow_sensor_pin3,
-      pressure_sensor_pin0: telemetryData.sensors.pressure_sensor_pin0,
+      rpm_sensor: telemetryData.sensors.rpm_sensor,
+      pressure_sensor: telemetryData.sensors.pressure_sensor,
       ...componentStates
     };
   };
@@ -179,8 +179,8 @@ function SystemMonitor() {
       entry.cycle_running,
       entry.current_phase,
       `"${entry.current_phase_name}"`, // Wrap in quotes to handle spaces
-      entry.flow_sensor_pin3,
-      entry.pressure_sensor_pin0 || 0,
+      entry.rpm_sensor,
+      entry.pressure_sensor || 0,
       entry.retractor_pin7,
       entry.cold_valve2_pin8,
       entry.hot_valve_pin9,
@@ -366,11 +366,10 @@ function SystemMonitor() {
   useEffect(() => {
     const handleSystemMessage = (data: any) => {
       try {
-
+        
         // Handle telemetry data response
         if (data.cycle_running !== undefined) {
           setTelemetryData(data);
-          
           // Update pin states from components array
           if (data.components && Array.isArray(data.components)) {
             const newPinStates: { [key: number]: boolean } = {};
@@ -391,7 +390,7 @@ function SystemMonitor() {
             current_phase_name: telemetryData?.current_phase_name ?? "",
             elapsed_seconds: telemetryData?.elapsed_seconds ?? 0,
             components: telemetryData?.components ?? [],
-            sensors: telemetryData?.sensors ?? { flow_sensor_pin3: 0 },
+            sensors: telemetryData?.sensors ?? { rpm_sensor: 0, pressure_sensor: 0 },
             timestamp: telemetryData?.timestamp ?? Date.now()
           };
           setTelemetryData(resetData);
@@ -428,7 +427,7 @@ function SystemMonitor() {
 
   useEffect(() => {
     if(telemetryData?.cycle_running){
-      console.log(createLogEntry(telemetryData!, elapsedTime));
+      createLogEntry(telemetryData!, elapsedTime)
       setSensorLog(prev => [...prev, createLogEntry(telemetryData!, elapsedTime)]);
     }
   }, [ifRunningCycle, elapsedTime]);

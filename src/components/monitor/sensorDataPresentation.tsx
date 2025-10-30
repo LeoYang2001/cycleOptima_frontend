@@ -5,14 +5,12 @@ interface SensorDataPoint {
   timestamp: number;
   rpm: number; // Changed from flowRate to rpm
   pressure: number;
-  temperature: number;
-  waterLevel: number;
 }
 
 interface TelemetryData {
   sensors: {
-    flow_sensor_pin3: number;
-    pressure_sensor_pin0?: number; // <-- Add this line
+    rpm_sensor: number;
+    pressure_sensor?: number; // <-- Add this line
   };
   timestamp: number;
 }
@@ -29,22 +27,20 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
   telemetryData
 }) => {
   const [sensorHistory, setSensorHistory] = useState<SensorDataPoint[]>([]);
-  const [selectedSensor, setSelectedSensor] = useState<'rpm' | 'pressure' | 'temperature' | 'water'>('rpm');
+  const [selectedSensor, setSelectedSensor] = useState<'rpm' | 'pressure'>('rpm');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maxDataPoints = 50; // Keep last 50 data points
 
   // Add new data point when telemetry updates
   useEffect(() => {
     if (telemetryData && isOpen) {
-      const rawRPM = telemetryData.sensors.flow_sensor_pin3;
-      const rawPressure = telemetryData.sensors.pressure_sensor_pin0;
+      const rawRPM = telemetryData.sensors.rpm_sensor;
+      const rawPressure = telemetryData.sensors.pressure_sensor;
 
       const newDataPoint: SensorDataPoint = {
         timestamp: Date.now(),
         rpm: typeof rawRPM === 'number' ? rawRPM : 0, // Ensure it's a number
         pressure: typeof rawPressure === 'number' ? rawPressure : 0, // Ensure it's a number
-        temperature: 39.7 + Math.sin(Date.now() / 8000) * 2,
-        waterLevel: 74.5 + Math.cos(Date.now() / 6000) * 10,
       };
 
       setSensorHistory(prev => {
@@ -106,25 +102,13 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
         color: '#10b981', 
         data: sensorHistory.map(d => d.rpm),
         min: 0,
-        max: 800
+        max: 900
       },
       pressure: { 
         color: '#3b82f6', 
         data: sensorHistory.map(d => d.pressure),
         min: 23000, // Changed from 27000 to 23000
         max: 27500  // Changed from 32000 to 27500
-      },
-      temperature: { 
-        color: '#ef4444', 
-        data: sensorHistory.map(d => d.temperature),
-        min: 20,
-        max: 60
-      },
-      water: { 
-        color: '#06b6d4', 
-        data: sensorHistory.map(d => d.waterLevel),
-        min: 0,
-        max: 100
       }
     };
 
@@ -232,9 +216,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
     ctx.rotate(-Math.PI / 2);
     const yAxisLabel = 
                        selectedSensor === 'rpm' ? 'RPM' :
-                       selectedSensor === 'pressure' ? 'Pressure (bar)' :
-                       selectedSensor === 'temperature' ? 'Temperature (°C)' :
-                       'Water Level (%)';
+                      'Pressure (bar)' ;
     ctx.fillText(yAxisLabel, 0, 0);
     ctx.restore();
 
@@ -248,8 +230,6 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
     return {
       rpm: latest.rpm || 0, // Provide default value
       pressure: latest.pressure || 0, // Provide default value
-      temperature: latest.temperature || 0, // Provide default value
-      waterLevel: latest.waterLevel || 0 // Provide default value
     };
   };
 
@@ -336,10 +316,8 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <span style={{ fontSize: '14px', color: '#94a3b8' }}>Show:</span>
             {[
-              { key: 'rpm', label: 'RPM', icon: Droplets }, // Changed from flow/Flow Rate to rpm/RPM
+              { key: 'rpm', label: 'RPM', icon: Droplets },
               { key: 'pressure', label: 'Pressure', icon: Gauge },
-              { key: 'temperature', label: 'Temperature', icon: Thermometer },
-              { key: 'water', label: 'Water Level', icon: Droplets }
             ].map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -458,37 +436,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
                     <div style={{ fontSize: '12px', color: '#64748b' }}>bar</div>
                   </div>
 
-                  <div style={{
-                    padding: '16px',
-                    background: '#0f0f0f',
-                    border: '1px solid #333',
-                    borderRadius: '8px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <Thermometer size={16} style={{ color: '#ef4444' }} />
-                      <span style={{ fontSize: '14px', color: '#94a3b8' }}>Temperature</span>
-                    </div>
-                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#ef4444' }}>
-                      {(latestValues.temperature || 0).toFixed(1)} {/* Add null coalescing operator */}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>°C</div>
-                  </div>
 
-                  <div style={{
-                    padding: '16px',
-                    background: '#0f0f0f',
-                    border: '1px solid #333',
-                    borderRadius: '8px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <Droplets size={16} style={{ color: '#06b6d4' }} />
-                      <span style={{ fontSize: '14px', color: '#94a3b8' }}>Water Level</span>
-                    </div>
-                    <div style={{ fontSize: '24px', fontWeight: '700', color: '#06b6d4' }}>
-                      {(latestValues.waterLevel || 0).toFixed(1)} {/* Add null coalescing operator */}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#64748b' }}>%</div>
-                  </div>
                 </>
               ) : (
                 <div style={{

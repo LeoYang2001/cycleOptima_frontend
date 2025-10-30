@@ -41,14 +41,8 @@ function PhaseBreakdown({ Phases, cycle, deletePhase }: PhaseBreakdownProps) {
         unit: 'Hz',
         bgColor: '#3b82f6/20',
         borderColor: '#3b82f6/30'
-      },
-      Temperature: { 
-        icon: Gauge, 
-        color: '#ef4444', 
-        unit: '°C',
-        bgColor: '#ef4444/20',
-        borderColor: '#ef4444/30'
       }
+     
     };
 
     return sensorConfig[type as keyof typeof sensorConfig] || {

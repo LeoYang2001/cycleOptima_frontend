@@ -46,11 +46,7 @@ function App() {
       console.error("🔥 Socket.io connection error:", error);
     });
 
-    // Listen for cycle events
-    // socket.on("cycle_updated", () => {
-    //   console.log("🔄 Received cycle_updated event, refetching cycles...");
-    //   dispatch(fetchAllCycles()); // Refetch when notified
-    // });
+  
 
     socket.on("cycle_created", () => {
       console.log("🆕 Received cycle_created event, refetching cycles...");
