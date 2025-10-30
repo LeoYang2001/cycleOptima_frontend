@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, TrendingUp, Thermometer, Droplets, Gauge } from 'lucide-react';
 
-interface SensorDataPoint {
+export interface SensorDataPoint {
   timestamp: number;
   rpm: number; // Changed from flowRate to rpm
   pressure: number;
@@ -19,14 +19,18 @@ interface SensorDataPresentationProps {
   isOpen: boolean;
   onClose: () => void;
   telemetryData: TelemetryData | null;
+  sensorHistory: SensorDataPoint[];
+  setSensorHistory: React.Dispatch<React.SetStateAction<SensorDataPoint[]>>;
 }
 
 const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
   isOpen,
   onClose,
-  telemetryData
+  telemetryData,
+  sensorHistory,
+  setSensorHistory
 }) => {
-  const [sensorHistory, setSensorHistory] = useState<SensorDataPoint[]>([]);
+  
   const [selectedSensor, setSelectedSensor] = useState<'rpm' | 'pressure'>('rpm');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maxDataPoints = 50; // Keep last 50 data points
@@ -50,12 +54,11 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
     }
   }, [telemetryData, isOpen]);
 
-  // Clear history when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setSensorHistory([]);
-    }
-  }, [isOpen]);
+   const onReset = () => {
+    setSensorHistory([]);
+    console.log('Sensor history reset');
+  };
+
 
   // Draw the graph
   useEffect(() => {
@@ -155,7 +158,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
         const dataIndex = i * timeInterval;
         const timeDiff = Math.floor((Date.now() - sensorHistory[dataIndex]?.timestamp) / 1000);
         ctx.textAlign = 'center';
-        ctx.fillText(`${timeDiff}s`, x, height - padding.bottom + 15);
+        ctx.fillText(``, x, height - padding.bottom + 15);
       }
     }
 
@@ -306,6 +309,7 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
         </div>
 
         {/* Controls */}
+                {/* Controls */}
         <div style={{
           padding: '20px 24px',
           borderBottom: '1px solid #333',
@@ -343,8 +347,26 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
             ))}
           </div>
           
-          <div style={{ fontSize: '14px', color: '#94a3b8' }}>
-            Data Points: {sensorHistory.length}/{maxDataPoints}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ fontSize: '14px', color: '#94a3b8' }}>
+              Data Points: {sensorHistory.length}/{maxDataPoints}
+            </div>
+            <button
+              onClick={onReset}
+              style={{
+                padding: '8px 16px',
+                background: '#6b7280',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              🔄 Reset Data
+            </button>
           </div>
         </div>
 

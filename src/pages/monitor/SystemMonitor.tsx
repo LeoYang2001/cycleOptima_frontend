@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useSelector } from 'react-redux';
-import SensorDataPresentation from "../../components/monitor/sensorDataPresentation";
+import SensorDataPresentation, { type SensorDataPoint } from "../../components/monitor/sensorDataPresentation";
 import LiveSensorCard from "../../components/monitor/LiveSensorCard";
 import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
 import { set } from "zod";
@@ -119,6 +119,8 @@ function SystemMonitor() {
 
   const [ifRunningCycle, setIfRunningCycle] = useState(false);
     const [sensorLog, setSensorLog] = useState<SensorLogEntry[]>([]);
+
+    const [sensorHistory, setSensorHistory] = useState<SensorDataPoint[]>([]);
 
 
    const createLogEntry = (telemetryData: TelemetryData, elapsedTime: number): SensorLogEntry => {
@@ -1004,6 +1006,8 @@ function SystemMonitor() {
       {/* Sensor Data Modal */}
       <SensorDataPresentation
         isOpen={showSensorModal}
+        sensorHistory={sensorHistory}
+        setSensorHistory={setSensorHistory}
         onClose={() => setShowSensorModal(false)}
         telemetryData={telemetryData}
       />
