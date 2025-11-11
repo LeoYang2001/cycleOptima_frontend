@@ -1,11 +1,30 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import type { AppDispatch } from '../../store';
 import SensorDataPresentation, { type SensorDataPoint } from "../../components/monitor/sensorDataPresentation";
 import LiveSensorCard from "../../components/monitor/LiveSensorCard";
 import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
-import { set } from "zod";
-import { Gauge } from "lucide-react"; // Add at the top for the RPM icon
+import {
+  selectTelemetry,
+  selectGPIOStates,
+  selectCycleStatus,
+  selectCycleRunning,
+  selectSensorData,
+  selectRPM,
+  selectPressure,
+  selectCurrentPhaseName,
+  selectRPMHistory,
+  selectPressureHistory,
+  selectLastUpdateTime,
+  selectCycleData,
+  togglePin as togglePinAction,
+  startCycle,
+  stopCycle,
+  skipPhase,
+  skipToPhase,
+} from '../../store/washerSlice';
+import { Gauge } from "lucide-react";
 
 const pins = [
   { name: "RETRACTOR_PIN", pin: 7 },
@@ -17,28 +36,6 @@ const pins = [
   { name: "MOTOR_ON_PIN", pin: 4 },
   { name: "MOTOR_DIRECTION_PIN", pin: 10 },
 ];
-
-
-
-
-
-interface TelemetryData {
-  cycle_running: boolean;
-  current_phase: number;
-  total_phases: number;
-  current_phase_name: string;
-  elapsed_seconds: number;
-  components: Array<{
-    name: string;
-    pin: number;
-    active: boolean;
-  }>;
-  sensors: {
-    rpm_sensor: number;
-    pressure_sensor?: number; // <-- Add this line
-  };
-  timestamp: number;
-}
 
 interface Phase {
   id: string;
@@ -97,16 +94,27 @@ interface SensorLogEntry {
 
 function SystemMonitor() {
   const location = useLocation();
+  const dispatch = useDispatch<AppDispatch>();
   const wsConnected = useSelector(selectWebSocketConnected);
   
-  // Get cycle data from navigation state
+  // Use washer slice selectors
+  const telemetryData = useSelector(selectTelemetry);
+  const gpioStates = useSelector(selectGPIOStates);
+  const cycleStatus = useSelector(selectCycleStatus);
+  const cycleRunning = useSelector(selectCycleRunning);
+  const sensorData = useSelector(selectSensorData);
+  const rpm = useSelector(selectRPM);
+  const pressure = useSelector(selectPressure);
+  const currentPhaseName = useSelector(selectCurrentPhaseName);
+  const lastUpdateTime = useSelector(selectLastUpdateTime);
+  const cycleDataFromTelemetry = useSelector(selectCycleData); // Get cycle_data from telemetry
+  
+  // Get cycle data from navigation state (fallback for initial load)
   const cycleData: CycleData | null = location.state?.cycleData || null;
 
   const timestamp = location.state?.timestamp || null;
 
-  const [pinStates, setPinStates] = useState<Record<number, boolean>>({});
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-  const [telemetryData, setTelemetryData] = useState<TelemetryData | null>(null);
 
   // Add state for sensor data modal
   const [showSensorModal, setShowSensorModal] = useState(false);
@@ -119,31 +127,56 @@ function SystemMonitor() {
   const [ifStoppingCycle, setIfStoppingCycle] = useState(false);
 
   const [ifRunningCycle, setIfRunningCycle] = useState(false);
-    const [sensorLog, setSensorLog] = useState<SensorLogEntry[]>([]);
+  const [sensorLog, setSensorLog] = useState<SensorLogEntry[]>([]);
+  const [sensorHistory, setSensorHistory] = useState<SensorDataPoint[]>([]);
 
-    const [sensorHistory, setSensorHistory] = useState<SensorDataPoint[]>([]);
+  // Helper function to get GPIO state by pin number
+  const getGPIOState = (pin: number): boolean => {
+    const gpio = gpioStates.find(g => g.pin === pin);
+    return gpio?.state === 1;
+  };
 
+  const createLogEntry = (elapsedTime: number): SensorLogEntry => {
+    if (!telemetryData || !cycleStatus || !sensorData) {
+      // Return empty/default log entry if no data
+      return {
+        timestamp: Date.now(),
+        elapsedSeconds: elapsedTime,
+        cycle_running: false,
+        current_phase: 0,
+        current_phase_name: '',
+        rpm_sensor: 0,
+        pressure_sensor: 0,
+        retractor_pin7: false,
+        cold_valve2_pin8: false,
+        hot_valve_pin9: false,
+        drain_pump_pin19: false,
+        cold_valve1_pin5: false,
+        cold_valve3_pin18: false,
+        motor_on_pin4: false,
+        motor_direction_pin10: false,
+      };
+    }
 
-   const createLogEntry = (telemetryData: TelemetryData, elapsedTime: number): SensorLogEntry => {
     const componentStates = {
-      retractor_pin7: pinStates[7] || false,
-      cold_valve2_pin8: pinStates[8] || false,
-      hot_valve_pin9: pinStates[9] || false,
-      drain_pump_pin19: pinStates[19] || false,
-      cold_valve1_pin5: pinStates[5] || false,
-      cold_valve3_pin18: pinStates[18] || false,
-      motor_on_pin4: pinStates[4] || false,
-      motor_direction_pin10: pinStates[10] || false,
+      retractor_pin7: getGPIOState(7),
+      cold_valve2_pin8: getGPIOState(8),
+      hot_valve_pin9: getGPIOState(9),
+      drain_pump_pin19: getGPIOState(19),
+      cold_valve1_pin5: getGPIOState(5),
+      cold_valve3_pin18: getGPIOState(18),
+      motor_on_pin4: getGPIOState(4),
+      motor_direction_pin10: getGPIOState(10),
     };
 
     return {
       timestamp: Date.now(),
       elapsedSeconds: elapsedTime,
-      cycle_running: telemetryData.cycle_running,
-      current_phase: telemetryData.current_phase,
-      current_phase_name: telemetryData.current_phase_name,
-      rpm_sensor: telemetryData.sensors.rpm_sensor,
-      pressure_sensor: telemetryData.sensors.pressure_sensor,
+      cycle_running: cycleStatus.cycle_running,
+      current_phase: cycleStatus.current_phase_index,
+      current_phase_name: cycleStatus.current_phase_name,
+      rpm_sensor: sensorData.rpm,
+      pressure_sensor: sensorData.pressure_freq,
       ...componentStates
     };
   };
@@ -232,6 +265,25 @@ function SystemMonitor() {
   };
   // Get phase durations for timeline rendering
   const getPhaseTimeline = () => {
+    // Prioritize cycle_data from telemetry (real-time from ESP32)
+    if (cycleDataFromTelemetry && cycleDataFromTelemetry.length > 0) {
+      return cycleDataFromTelemetry.map((phase, index) => {
+        // Calculate phase duration from components
+        const phaseDuration = phase.components.reduce((max, component) => {
+          return Math.max(max, component.start_ms + component.duration_ms);
+        }, 0);
+        
+        return {
+          id: phase.id,
+          name: phase.name,
+          color: `#${phase.color}`,
+          duration: phaseDuration,
+          index: index + 1 // ESP32 uses 1-based indexing (0=idle, 1=first phase, etc.)
+        };
+      });
+    }
+    
+    // Fallback to navigation state cycle data
     if (!cycleData?.data.phases) return [];
     
     return cycleData.data.phases.map((phase, index) => {
@@ -240,11 +292,11 @@ function SystemMonitor() {
       }, 0);
       
       return {
-        id: phase.id, // Add id property
+        id: phase.id,
         name: phase.name,
         color: `#${phase.color}`,
         duration: phaseDuration,
-        index: index + 1
+        index: index + 1 // ESP32 uses 1-based indexing (0=idle, 1=first phase, etc.)
       };
     });
   };
@@ -269,76 +321,44 @@ function SystemMonitor() {
   // Update the togglePin function to check cycle status
   const togglePin = async (pin: number) => {
     // Don't allow toggling if cycle is running
-    if (telemetryData?.cycle_running) {
+    if (cycleRunning) {
       console.log('Cannot toggle pins while cycle is running');
       return;
     }
 
-    const isOn = pinStates[pin];
-    const command = `gpio:${pin}:${isOn ? '0' : '1'}`;
+    // Use the togglePin action from washer slice
+    // @ts-ignore - dispatch returns a thunk function
+    const success = dispatch(togglePinAction(pin));
     
-    try {
-      const success = websocketManager.send(command);
-      if (success) {
-        setPinStates((prev) => ({ ...prev, [pin]: !isOn }));
-      } else {  
-        alert('Failed to send command. WebSocket not connected.');
-      }
-    } catch (err) {
-      console.error(`Failed to toggle pin ${pin}:`, err);
-      alert(`Failed to toggle pin ${pin}: ${(err as Error).message}`);
+    if (!success) {
+      console.error(`Failed to toggle pin ${pin} - WebSocket may not be connected`);
     }
   };
 
-  const formatElapsedTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+  const formatElapsedTime = (milliseconds: number): string => {
+    const totalSeconds = Math.floor(milliseconds / 1000) ;
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
 
   const handleStartCycle = () => {
-    // Clear any existing interval first
-    if (counterIntervalRef.current) {
-      clearInterval(counterIntervalRef.current);
-      counterIntervalRef.current = null;
-    }
-
-    sendWebSocketCommand("start");
-    startPolling();
-      setIfRunningCycle(true)
-
-    
-    // Start elapsed time counter
-    setElapsedTime(0);
-    counterIntervalRef.current = setInterval(() => {
-      setElapsedTime(prev => prev + 0.5);
-    }, 500);
+    dispatch(startCycle());
   };
 
   const handleStopCycle = () => {
-    sendWebSocketCommand("stop");
+    dispatch(stopCycle());
+  };
 
-      setIfRunningCycle(false);
-    // Stop elapsed time counter
-    if (counterIntervalRef.current) {
-      clearInterval(counterIntervalRef.current);
-      counterIntervalRef.current = null;
-    }
-    setElapsedTime(0);
+  const handleSkipPhase = () => {
+    dispatch(skipPhase());
+  };
 
-    // Handle polling interval
-    if (pollingInterval) {
-      setIfStoppingCycle(true);
-      setTimeout(() => {
-        clearInterval(pollingInterval);
-        setPollingInterval(null);
-        setIfStoppingCycle(false);
-      }, 1500);
-    }
-    promptCSVDownload();
-  }
+    const handleSkipToPhase = (index: number) => {
+    dispatch(skipToPhase(index));
+  };
 
   // Update the startPolling function
   const startPolling = () => {
@@ -359,61 +379,19 @@ function SystemMonitor() {
   };
 
   const calculateProgress = () => {
-    if (!telemetryData || !telemetryData.total_phases ||  telemetryData.total_phases === 0) return 0;
-    return (telemetryData.current_phase / telemetryData.total_phases) * 100;
+    if (!cycleStatus || !cycleStatus.total_phases || cycleStatus.total_phases === 0) return 0;
+    // Phase index 0 = idle, so subtract 1 for actual progress
+    // If phase is 0 (idle), progress is 0
+    if (cycleStatus.current_phase_index === 0) return 0;
+    return ((cycleStatus.current_phase_index - 1) / cycleStatus.total_phases) * 100;
   };
 
-
-
-  // Update the useEffect hook to handle WebSocket messages
+  // Update the useEffect hook - remove old WebSocket message handler since washer slice handles it
   useEffect(() => {
-    const handleSystemMessage = (data: any) => {
-      try {
-        
-        // Handle telemetry data response
-        if (data.cycle_running !== undefined) {
-          setTelemetryData(data);
-          // Update pin states from components array
-          if (data.components && Array.isArray(data.components)) {
-            const newPinStates: { [key: number]: boolean } = {};
-            data.components.forEach((component: { pin: number; active: boolean }) => {
-              newPinStates[component.pin] = component.active;
-            });
-            setPinStates(newPinStates);
-          }
-        }
-        else if(!data.success && data.type === 'telemetry'){
-
-          //cycle stop, reset telemetry data
-          const resetData: TelemetryData = {
-            ...telemetryData,
-            cycle_running: false,
-            current_phase: 0,
-            total_phases: telemetryData?.total_phases ?? 0,
-            current_phase_name: telemetryData?.current_phase_name ?? "",
-            elapsed_seconds: telemetryData?.elapsed_seconds ?? 0,
-            components: telemetryData?.components ?? [],
-            sensors: telemetryData?.sensors ?? { rpm_sensor: 0, pressure_sensor: 0 },
-            timestamp: telemetryData?.timestamp ?? Date.now()
-          };
-          setTelemetryData(resetData);
-
-
-          //reset pins
-          setPinStates({});
-          console.log('reset pin states')
-        }
-      } catch (error) {
-        console.error('Error processing system message:', error);
-      }
-    };
-
-    // Register message handler
-    websocketManager.registerMessageHandler('systemMonitor', handleSystemMessage);
-
+    // No need for custom message handler - washer slice updates automatically
+    
     // Cleanup function
     return () => {
-      websocketManager.unregisterMessageHandler('systemMonitor');
       if (pollingInterval) {
         clearInterval(pollingInterval);
         setPollingInterval(null);
@@ -429,14 +407,15 @@ function SystemMonitor() {
   const phaseTimeline = getPhaseTimeline();
 
   useEffect(() => {
-    if(telemetryData?.cycle_running){
-      createLogEntry(telemetryData!, elapsedTime)
-      setSensorLog(prev => [...prev, createLogEntry(telemetryData!, elapsedTime)]);
+    if(cycleRunning){
+      setSensorLog(prev => [...prev, createLogEntry(elapsedTime)]);
     }
   }, [ifRunningCycle, elapsedTime]);
 
   return (
-    <div style={{ 
+    <div 
+    className=" w-full px-8"
+    style={{ 
       minHeight: "100vh", 
       color: "#fff", 
       fontFamily: "Inter, system-ui, sans-serif"
@@ -462,23 +441,25 @@ function SystemMonitor() {
             margin: "0",
             fontSize: "14px"
           }}>
-            {cycleData 
-              ? `Monitoring cycle flashed at ${new Date(timestamp).toLocaleTimeString()} • ${phaseTimeline.length} phases`
-              : "Real-time monitoring and control of active washer cycle"
+            {cycleDataFromTelemetry.length > 0
+              ? `Live telemetry • ${cycleDataFromTelemetry.length} phases from ESP32`
+              : cycleData 
+                ? `Monitoring cycle flashed at ${new Date(timestamp).toLocaleTimeString()} • ${phaseTimeline.length} phases`
+                : "Real-time monitoring and control of active washer cycle"
             }
           </p>
         </div>
-        {/* Show cycle info badge if we have cycle data */}
-        {cycleData && (
+        {/* Show cycle info badge */}
+        {(cycleData || cycleDataFromTelemetry.length > 0) && (
           <div style={{
             padding: "8px 16px",
-            background: "#059669",
+            background: cycleDataFromTelemetry.length > 0 ? "#10b981" : "#059669",
             borderRadius: "20px",
             fontSize: "12px",
             fontWeight: "600",
             textTransform: "uppercase"
           }}>
-            CYCLE LOADED
+            {cycleDataFromTelemetry.length > 0 ? "LIVE CYCLE DATA" : "CYCLE LOADED"}
           </div>
         )}
       </div>
@@ -552,7 +533,10 @@ function SystemMonitor() {
                 Current Phase:
               </span>
               <span style={{ fontSize: "14px", fontWeight: "600" }}>
-                Phase {telemetryData?.current_phase } of {telemetryData?.total_phases || phaseTimeline.length}
+                {cycleStatus?.current_phase_index === 0 
+                  ? "Idle" 
+                  : `Phase ${cycleStatus?.current_phase_index || 0} of ${cycleStatus?.total_phases || phaseTimeline.length}`
+                }
               </span>
             </div>
             <div style={{
@@ -562,9 +546,11 @@ function SystemMonitor() {
               overflow: "hidden"
             }}>
               <div style={{
-                background: "#22c55e",
+                background: cycleStatus?.current_phase_index === 0 ? "#6b7280" : "#22c55e",
                 height: "100%",
-                width: `${(telemetryData && telemetryData.total_phases) ? (telemetryData.current_phase / telemetryData.total_phases) * 100 : 0}%`,
+                width: `${(cycleStatus && cycleStatus.total_phases && cycleStatus.current_phase_index > 0) 
+                  ? ((cycleStatus.current_phase_index - 1) / cycleStatus.total_phases) * 100 
+                  : 0}%`,
               }}></div>
             </div>
           </div>
@@ -572,17 +558,35 @@ function SystemMonitor() {
           {/* Phase Timeline - Dynamic based on cycle data */}
           <div style={{ marginBottom: "20px" }}>
             <div style={{ fontSize: "14px", color: "#94a3b8", marginBottom: "12px" }}>
-              Phase Timeline {cycleData && `(${cycleData.data.name})`}
+              Phase Timeline
+              {cycleDataFromTelemetry.length > 0 && " (Live from ESP32)"}
+              {!cycleDataFromTelemetry.length && cycleData && ` (${cycleData.data.name})`}
             </div>
             <div style={{ display: "flex", height: "40px", borderRadius: "6px" }}>
               {phaseTimeline.length > 0 ? (
                 phaseTimeline.map((phase, index) => {
-                  // Find the full phase object from cycleData to check for sensorTrigger
+                  // Check for sensor trigger - only from navigation cycleData (not in telemetry cycle_data)
                   const fullPhase = cycleData?.data.phases?.find(p => p.id === phase.id || p.name === phase.name);
 
                   return (
                     <div 
-                      key={phase.name}
+                      
+                      onClick={()=>{
+                        // also do not allow skip backwards
+                        if(cycleStatus?.current_phase_index === 0){
+                          alert("Cannot skip phases while idle");
+                          return;
+                        }
+                        if(cycleStatus?.current_phase_index && cycleStatus?.current_phase_index > phase.index)
+                        {
+                          alert("Cannot skip backwards to previous phases");
+                          return;
+                        }
+                        else{
+                          handleSkipToPhase(phase.index - 1);
+                        }
+                      }}
+                      key={phase.id || phase.name}
                       style={{ 
                         background: phase.color, 
                         flex: "1", 
@@ -592,8 +596,8 @@ function SystemMonitor() {
                         fontSize: "12px",
                         fontWeight: "600",
                         position: "relative",
-                        opacity: telemetryData?.current_phase === phase.index ? 1 : 0.7,
-                        border: telemetryData?.current_phase === phase.index ? "2px solid #fff" : "none"
+                        opacity: cycleStatus?.current_phase_index === phase.index ? 1 : 0.7,
+                        border: cycleStatus?.current_phase_index === phase.index ? "2px solid #fff" : "none"
                       }}
                     >
                       <span>{phase.name}</span>
@@ -617,7 +621,7 @@ function SystemMonitor() {
                           <Gauge size={14} color="#fff" />
                         </span>
                       )}
-                      {telemetryData?.current_phase === phase.index && (
+                      {cycleStatus?.current_phase_index === phase.index && (
                         <div style={{
                           position: "absolute",
                           top: "-8px",
@@ -687,16 +691,27 @@ function SystemMonitor() {
 
           {/* Time Display */}
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <div style={{ textAlign: "center" }}>
+            <div style={{ textAlign: "center", flex: 1 }}>
               <div style={{ fontSize: "32px", fontWeight: "700", color: "#fff" }}>
                 {/* use local timestamp  */}
-                {formatElapsedTime(elapsedTime)}
+                {formatElapsedTime(cycleStatus?.phase_elapsed_ms || elapsedTime * 1000)}
               </div>
-              <div style={{ fontSize: "12px", color: "#64748b" }}>Elapsed Time</div>
+              <div style={{ fontSize: "12px", color: "#64748b" }}>
+                {cycleStatus?.current_phase_index === 0 ? "Idle Time" : "Phase Elapsed"}
+              </div>
             </div>
-            <div style={{ textAlign: "center" }}>
+            <div style={{ textAlign: "center", flex: 1 }}>
+              <div style={{ fontSize: "32px", fontWeight: "700", color: cycleStatus?.current_phase_index === 0 ? "#6b7280" : "#fff" }}>
+                {cycleStatus?.current_phase_index === 0 
+                  ? "IDLE" 
+                  : currentPhaseName || "—"
+                }
+              </div>
+              <div style={{ fontSize: "12px", color: "#64748b" }}>Current Status</div>
+            </div>
+            <div style={{ textAlign: "center", flex: 1 }}>
               <div style={{ fontSize: "32px", fontWeight: "700", color: "#fff" }}>
-                {cycleData ? `${phaseTimeline.length}` : "4"}
+                {cycleStatus?.total_phases || phaseTimeline.length}
               </div>
               <div style={{ fontSize: "12px", color: "#64748b" }}>Total Phases</div>
             </div>
@@ -743,16 +758,16 @@ function SystemMonitor() {
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: telemetryData?.cycle_running ? "not-allowed" : "pointer",
+                cursor: cycleRunning ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                opacity: telemetryData?.cycle_running ? "0.5" : "1",
+                opacity: cycleRunning ? "0.5" : "1",
                 transition: "all 0.2s ease"
               }}
               onClick={handleStartCycle}
-              disabled={telemetryData?.cycle_running}
-              title={telemetryData?.cycle_running ? "Cannot start while cycle is running" : "Start cycle"}
+              disabled={cycleRunning}
+              title={cycleRunning ? "Cannot start while cycle is running" : "Start cycle"}
             >
               ▶ Start Cycle
             </button>
@@ -767,44 +782,22 @@ function SystemMonitor() {
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: !telemetryData?.cycle_running || ifStoppingCycle ? "not-allowed" : "pointer",
+                cursor: !cycleRunning || ifStoppingCycle ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                opacity: !telemetryData?.cycle_running || ifStoppingCycle ? "0.5" : "1",
+                opacity: !cycleRunning || ifStoppingCycle ? "0.5" : "1",
                 transition: "all 0.2s ease"
               }}
               onClick={handleStopCycle}
-              disabled={!telemetryData?.cycle_running || ifStoppingCycle}
-              title={!telemetryData?.cycle_running ? "No cycle running to stop" : 
+              disabled={!cycleRunning || ifStoppingCycle}
+              title={!cycleRunning ? "No cycle running to stop" : 
                      ifStoppingCycle ? "Stopping cycle..." : "Stop cycle"}
             >
               {ifStoppingCycle ? '⏳ Stopping...' : '⏹ Stop Cycle'}
             </button>
 
-            {/* Previous Phase Button - Only enabled when cycle is running */}
-            <button
-              style={{
-                padding: "12px 20px",
-                background: "#3b82f6",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                fontWeight: "600",
-                fontSize: "14px",
-                cursor: !telemetryData?.cycle_running ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                opacity: !telemetryData?.cycle_running ? "0.5" : "1",
-                transition: "all 0.2s ease"
-              }}
-              onClick={() => sendWebSocketCommand("prev")}
-              disabled={!telemetryData?.cycle_running}
-              title={!telemetryData?.cycle_running ? "No cycle running" : "Go to previous phase"}
-            >
-              ⏮ Previous Phase
-            </button>
+         
 
             {/* Skip Phase Button - Only enabled when cycle is running */}
             <button
@@ -816,43 +809,21 @@ function SystemMonitor() {
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: !telemetryData?.cycle_running ? "not-allowed" : "pointer",
+                cursor: !cycleRunning ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                opacity: !telemetryData?.cycle_running ? "0.5" : "1",
+                opacity: !cycleRunning ? "0.5" : "1",
                 transition: "all 0.2s ease"
               }}
-              onClick={() => sendWebSocketCommand("skip")}
-              disabled={!telemetryData?.cycle_running}
-              title={!telemetryData?.cycle_running ? "No cycle running" : "Skip current phase"}
+              onClick={handleSkipPhase}
+              disabled={!cycleRunning}
+              title={!cycleRunning ? "No cycle running" : "Skip current phase"}
             >
               ⏭ Skip Phase
             </button>
 
-            {/* Restart Phase Button - Only enabled when cycle is running */}
-            <button
-              style={{
-                padding: "12px 20px",
-                background: "#f59e0b",
-                color: "#fff",
-                border: "none",
-                borderRadius: "8px",
-                fontWeight: "600",
-                fontSize: "14px",
-                cursor: !telemetryData?.cycle_running ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                opacity: !telemetryData?.cycle_running ? "0.5" : "1",
-                transition: "all 0.2s ease"
-              }}
-              onClick={() => sendWebSocketCommand("restart")}
-              disabled={!telemetryData?.cycle_running}
-              title={!telemetryData?.cycle_running ? "No cycle running" : "Restart current phase"}
-            >
-              🔄 Restart Phase
-            </button>
+         
           </div>
         </div>
 
@@ -899,12 +870,12 @@ function SystemMonitor() {
               <span style={{ fontSize: "14px", color: "#94a3b8" }}>Cycle Status</span>
               <div style={{
                 padding: "4px 8px",
-                background: telemetryData?.cycle_running ? "#059669" : "#6b7280",
+                background: cycleRunning ? "#059669" : "#6b7280",
                 borderRadius: "12px",
                 fontSize: "12px",
                 fontWeight: "600"
               }}>
-                {telemetryData?.cycle_running ? "Running" : "Idle"}
+                {cycleRunning ? "Running" : "Idle"}
               </div>
             </div>
 
@@ -960,47 +931,50 @@ function SystemMonitor() {
           gridTemplateColumns: "repeat(4, 1fr)",
           gap: "16px"
         }}>
-          {pins.map(({ name, pin }) => (
-            <button
-              key={pin}
-              style={{
-                padding: "20px",
-                background: pinStates[pin] ? "#059669" : "#374151",
-                color: "#fff",
-                border: pinStates[pin] ? "2px solid #10b981" : "2px solid #4b5563",
-                borderRadius: "12px",
-                fontWeight: "600",
-                fontSize: "14px",
-                cursor: telemetryData?.cycle_running ? "not-allowed" : "pointer",
-                transition: "all 0.2s ease",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "8px",
-                opacity: telemetryData?.cycle_running ? "0.7" : "1"
-              }}
-              onClick={() => togglePin(pin)}
-              disabled={telemetryData?.cycle_running}
-              title={telemetryData?.cycle_running ? "Cannot toggle components while cycle is running" : ""}
-            >
-              <div style={{ 
-                width: "12px", 
-                height: "12px", 
-                borderRadius: "50%",
-                background: pinStates[pin] ? "#10b981" : "#6b7280"
-              }}></div>
-              <div style={{ fontSize: "12px", textAlign: "center" }}>
-                {name.replace("_PIN", "").replace("_", " ")}
-              </div>
-              <div style={{ 
-                fontSize: "10px", 
-                color: pinStates[pin] ? "#86efac" : "#9ca3af",
-                fontWeight: "500"
-              }}>
-                Pin {pin} - {pinStates[pin] ? "ON" : "OFF"}
-              </div>
-            </button>
-          ))}
+          {pins.map(({ name, pin }) => {
+            const isOn = !getGPIOState(pin);
+            return (
+              <button
+                key={pin}
+                style={{
+                  padding: "20px",
+                  background: isOn ? "#059669" : "#374151",
+                  color: "#fff",
+                  border: isOn ? "2px solid #10b981" : "2px solid #4b5563",
+                  borderRadius: "12px",
+                  fontWeight: "600",
+                  fontSize: "14px",
+                  cursor: cycleRunning ? "not-allowed" : "pointer",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "8px",
+                  opacity: cycleRunning ? "0.7" : "1"
+                }}
+                onClick={() => togglePin(pin)}
+                disabled={cycleRunning}
+                title={cycleRunning ? "Cannot toggle components while cycle is running" : ""}
+              >
+                <div style={{ 
+                  width: "12px", 
+                  height: "12px", 
+                  borderRadius: "50%",
+                  background: isOn ? "#10b981" : "#6b7280"
+                }}></div>
+                <div style={{ fontSize: "12px", textAlign: "center" }}>
+                  {name.replace("_PIN", "").replace("_", " ")}
+                </div>
+                <div style={{ 
+                  fontSize: "10px", 
+                  color: isOn ? "#86efac" : "#9ca3af",
+                  fontWeight: "500"
+                }}>
+                  Pin {pin} - {isOn ? "ON" : "OFF"}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
 

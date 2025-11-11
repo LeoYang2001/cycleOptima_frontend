@@ -5,6 +5,7 @@ import storage from "redux-persist/lib/storage"; // defaults to localStorage for
 import cycleReducer from "./cycleSlice";
 import libraryReducer from "./librarySlice";
 import websocketSlice from './websocketSlice';
+import washerReducer from './washerSlice';
 
 const rootPersistConfig = {
   key: "root",
@@ -17,7 +18,8 @@ export const store = configureStore({
   reducer: {
     cycles: cycleReducer,
     library: libraryReducer,
-    websocket: websocketSlice, 
+    websocket: websocketSlice,
+    washer: washerReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -18,6 +18,7 @@ import DeviceGuard from "./components/common/DeviceGuard";
 import { websocketManager } from "./store/websocketSlice";
 import CycleDetailLocal from "./pages/cycleDetail/CycleDetailLocal";
 import PhaseEditorLocal from "./pages/phaseEditor/PhaseEditorLocal";
+import WasherTelemetryExample from "./examples/WasherTelemetryExample";
 
 
 
@@ -83,6 +84,9 @@ function App() {
             <Route path="cycle-manager" element={<CycleManager />} />
             <Route path="ai-assistant" element={<AiAssistant />} />
             <Route path="system-monitor" element={<SystemMonitor />} />
+            {/* WasherTelemetryExample */}
+            <Route path="washer-telemetry" element={<WasherTelemetryExample />} />
+
             <Route path="/cycle/:id" element={<CycleDetail />} />
             <Route path="/cycle/:id/phase/:phaseId" element={<PhaseEditor />} />
             {/* Catch-all route - redirect any unmatched routes to home */}

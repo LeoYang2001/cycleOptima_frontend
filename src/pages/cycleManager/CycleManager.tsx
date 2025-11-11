@@ -478,7 +478,7 @@ function CycleManager() {
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full h-full flex flex-col ">
       {/* Header with source indicator */}
       <div className="w-full flex flex-row justify-between items-center gap-4 mb-4">
         <div className="flex items-center gap-3">

@@ -1,23 +1,5 @@
 import React from 'react';
-
-interface TelemetryData {
-  cycle_running: boolean;
-  current_phase: number;
-
-  total_phases: number;
-  current_phase_name: string;
-  elapsed_seconds: number;
-  components: Array<{
-    name: string;
-    pin: number;
-    active: boolean;
-  }>;
-  sensors: {
-    rpm_sensor: number;
-    pressure_sensor?: number; // Optional, for backward compatibility
-  };
-  timestamp: number;
-}
+import type { TelemetryData } from '../../store/washerSlice';
 
 interface LiveSensorCardProps {
   telemetryData: TelemetryData | null;
@@ -27,7 +9,7 @@ interface LiveSensorCardProps {
 const LiveSensorCard: React.FC<LiveSensorCardProps> = ({ telemetryData, onCardClick }) => {
   // Convert the raw sensor value to realistic RPM (assuming raw value is 0-100, convert to 0-800)
   const getRPMValue = () => {
-    const rawValue = telemetryData?.sensors?.rpm_sensor || 0;
+    const rawValue = telemetryData?.sensors?.rpm || 0;
     // Scale from 0-100 to 0-800 RPM range
     const scaledRPM = rawValue
     return scaledRPM.toFixed(0); // Round to whole number for RPM
@@ -36,11 +18,11 @@ const LiveSensorCard: React.FC<LiveSensorCardProps> = ({ telemetryData, onCardCl
   // Get realistic pressure value (0-5 bar range)
   const getPressureValue = () => {
     
-    // Use telemetryData.sensors.pressure_sensor if available, otherwise fallback to simulated value
+    // Use telemetryData.sensors.pressure_freq if available
     const pressure =
-      telemetryData?.sensors?.pressure_sensor !== undefined
-        ? telemetryData.sensors.pressure_sensor
-        : 0; // Simulated default pressure
+      telemetryData?.sensors?.pressure_freq !== undefined
+        ? telemetryData.sensors.pressure_freq
+        : 0; // Default pressure
     return Number(pressure).toFixed(1);
   };
 

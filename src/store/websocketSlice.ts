@@ -1,8 +1,10 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
+import { updateTelemetry } from './washerSlice';
+import type { TelemetryData } from './washerSlice';
 
-const WEBSOCKET_URL = "wss://192.168.0.200:8443/ws";
-// const WEBSOCKET_URL = "ws://172.20.10.5:8080/ws";
+// const WEBSOCKET_URL = "wss://192.168.0.200:8443/ws";
+const WEBSOCKET_URL = "ws://192.168.0.196:8080/ws";
 
 
 interface WebSocketState {
@@ -180,8 +182,13 @@ export class WebSocketManager {
       try {
         const data = JSON.parse(event.data);
         
-        // Update Redux state
+        // Update Redux state with last message
         this.dispatch(messageReceived(data));
+        
+        // If it's telemetry data, update washer slice
+        if (data.type === 'telemetry') {
+          this.dispatch(updateTelemetry(data as TelemetryData));
+        }
         
         // Call registered message handlers
         this.messageHandlers.forEach((handler, key) => {

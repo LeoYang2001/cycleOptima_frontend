@@ -46,7 +46,7 @@ export default function MainLayout() {
           style={{
             zIndex: 200,
           }}
-          className="  w-full flex-1 relative flex flex-col items-center justify-center"
+          className="  px-8 w-full flex-1 relative flex flex-col items-center justify-center"
         >
           
           <Outlet />

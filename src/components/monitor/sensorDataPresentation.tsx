@@ -1,18 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, TrendingUp, Thermometer, Droplets, Gauge } from 'lucide-react';
+import type { TelemetryData } from '../../store/washerSlice';
 
 export interface SensorDataPoint {
   timestamp: number;
   rpm: number; // Changed from flowRate to rpm
   pressure: number;
-}
-
-interface TelemetryData {
-  sensors: {
-    rpm_sensor: number;
-    pressure_sensor?: number; // <-- Add this line
-  };
-  timestamp: number;
 }
 
 interface SensorDataPresentationProps {
@@ -38,8 +31,8 @@ const SensorDataPresentation: React.FC<SensorDataPresentationProps> = ({
   // Add new data point when telemetry updates
   useEffect(() => {
     if (telemetryData && isOpen) {
-      const rawRPM = telemetryData.sensors.rpm_sensor;
-      const rawPressure = telemetryData.sensors.pressure_sensor;
+      const rawRPM = telemetryData.sensors.rpm;
+      const rawPressure = telemetryData.sensors.pressure_freq;
 
       const newDataPoint: SensorDataPoint = {
         timestamp: Date.now(),
