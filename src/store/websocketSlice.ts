@@ -3,8 +3,8 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 import { updateTelemetry } from './washerSlice';
 import type { TelemetryData } from './washerSlice';
 
-// const WEBSOCKET_URL = "wss://192.168.0.200:8443/ws";
-const WEBSOCKET_URL = "ws://192.168.0.196:8080/ws";
+const WEBSOCKET_URL = "wss://192.168.0.200:8443/ws";
+// const WEBSOCKET_URL = "ws://192.168.4.153:8080/ws";
 
 
 interface WebSocketState {

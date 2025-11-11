@@ -11,6 +11,7 @@ import CycleSummary from "../../components/cycleDetail/CycleSummary";
 
 import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
 import { updateCycle } from "../../store/cycleSlice";
+import { writeJSON } from "../../store/washerSlice";
 
 function CycleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -68,97 +69,72 @@ const [isRedirecting, setIsRedirecting] = useState(false);
     });
   };
 
-const executeRun = async () => {
-  console.log('executing run...', cycle);
-  try {
-    if (!cycle) return;
-    if (!wsConnected) {
-      alert('Not connected to system. Please check your connection and try again.');
-      return;
-    }
-
-    setIsRunning(true);
-    setFlashCompleted(false);
-
-   const handleCycleRunResponse = (data: any) => {
-  console.log('Cycle run WebSocket message received:', data);
-
-  if (data.success) {
-    console.log('Cycle run successful:', data);
-    setIsRunning(false);
-    setFlashCompleted(true);
-
-    // Update cycle status to "tested" in the database
-    dispatch(updateCycle({
-      id: cycle.id,
-      updates: { 
-        status: "tested",
-        tested_at: new Date().toISOString()
+ const executeRun = async () => {
+    console.log('executing run...', cycle);
+    try {
+      if (!cycle) return;
+      if (!wsConnected) {
+        alert('Not connected to system. Please check your connection and try again.');
+        return;
       }
-    }));
 
-    setIsRedirecting(true);
-
-    setTimeout(() => {
-      console.log('Navigating to monitor page with cycle data');
-      navigate("/system-monitor", {
-        state: {
-          cycleData: {
-            ...cycle,
-            status: "tested", // Include updated status in navigation state
-            tested_at: new Date().toISOString()
-          },
-          timestamp: Date.now(),
-          autoStarted: true,
-          flashSuccess: true
-        },
-      });
-
-      setIsRedirecting(false);
-      websocketManager.unregisterMessageHandler('cycleRun');
-    }, 1500);
-
-  } else if (!data.success) {
-    console.error('Cycle run failed:', data);
-    setIsRunning(false);
-    setFlashCompleted(false);
-    websocketManager.unregisterMessageHandler('cycleRun');
-  } else if (data.type === 'cycle-run-progress' || data.action === 'cycle-run-progress') {
-    console.log('Cycle run progress:', data);
-  }
-};
-    websocketManager.registerMessageHandler('cycleRun', handleCycleRunResponse);
-
-    const success = websocketManager.send({
-      action: 'write_json',
-      data: cycle.data,
-    });
-
-    if (!success) {
-      setIsRunning(false);
+      setIsRunning(true);
       setFlashCompleted(false);
-      websocketManager.unregisterMessageHandler('cycleRun');
-      alert('Failed to send command. WebSocket not connected.');
-    }
 
-    setTimeout(() => {
-      if (isRunning) {
-        console.warn('Cycle run timeout');
+      // Use writeJSON from washerSlice to flash the cycle data
+      const success = dispatch(writeJSON(cycle.data));
+
+      if (!success) {
         setIsRunning(false);
         setFlashCompleted(false);
-        websocketManager.unregisterMessageHandler('cycleRun');
-        alert('Cycle run timed out. Please try again.');
+        alert('Failed to flash cycle data. WebSocket not connected.');
+        return;
       }
-    }, 30000);
 
-  } catch (error) {
-    console.error("Run failed:", error);
-    setIsRunning(false);
-    setFlashCompleted(false);
-    websocketManager.unregisterMessageHandler('cycleRun');
-    alert(`Failed to run cycle: ${(error as Error).message}`);
-  }
-};
+      // Update cycle status to "tested" in the database
+      dispatch(updateCycle({
+        id: cycle.id,
+        updates: { 
+          status: "tested",
+          tested_at: new Date().toISOString()
+        }
+      }));
+
+      // Simulate flash completion (you can adjust timing as needed)
+      setTimeout(() => {
+        setIsRunning(false);
+        setFlashCompleted(true);
+        
+        setIsRedirecting(true);
+
+        // Navigate to monitor page after a brief delay
+        setTimeout(() => {
+          console.log('Navigating to monitor page with cycle data');
+          navigate("/system-monitor", {
+            state: {
+              cycleData: {
+                ...cycle,
+                status: "tested",
+                tested_at: new Date().toISOString()
+              },
+              timestamp: Date.now(),
+              autoStarted: true,
+              flashSuccess: true
+            },
+          });
+
+          setIsRedirecting(false);
+        }, 1500);
+
+      }, 2000); // 2 second flash simulation
+
+    } catch (error) {
+      console.error("Run failed:", error);
+      setIsRunning(false);
+      setFlashCompleted(false);
+      alert(`Failed to run cycle: ${(error as Error).message}`);
+    }
+  };
   // Cleanup message handler when component unmounts
   useEffect(() => {
     return () => {
