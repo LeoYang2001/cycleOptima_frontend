@@ -4,6 +4,7 @@ export type SensorTrigger = {
   type: string;
   pinNumber: number;
   threshold: number;
+  triggerAbove: boolean;
 };
 
 export type Phase = {

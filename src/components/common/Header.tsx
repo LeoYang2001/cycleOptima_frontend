@@ -27,7 +27,11 @@ import type { Cycle } from "../../types/common/Cycle";
 
 const LOCAL_CYCLES_PATH_KEY = "cycleOptima_local_cycles_path";
 
-function Header() {
+function Header({
+  headerRef
+}: {
+  headerRef: React.Ref<HTMLDivElement>;
+}) {
   const dispatch = useDispatch<AppDispatch>();
   const { decibelLevel, startDetection } = useDecibelDetector();
   const { session, setSession } = useSessionContext();
@@ -244,17 +248,11 @@ function Header() {
 
       // Save cycles to Redux store
 
-      // Console log the actual JavaScript objects array
-      console.log("=== LOADED CYCLES FROM HEADER ===");
-      console.log("Directory path:", directoryPath);
-      console.log("Total cycles loaded:", cyclesFromDirectory.length);
-      console.log("Cycles array (full objects):", cyclesFromDirectory);
 
       // Log each cycle object individually for better inspection
       cyclesFromDirectory.forEach((cycle, index) => {
         console.log(`Cycle ${index + 1}:`, cycle);
       });
-      console.log("=== END LOADED CYCLES ===");
 
       // Show success message with details
       const message =
@@ -386,13 +384,14 @@ const handleSaveWsConfig = () => {
 
   return (
     <div
+      ref={headerRef}
       style={{
-        height: "8%",
-        minHeight: 90,
         backgroundColor: Color.darkerColor,
         zIndex: 999,
+        height:"8%",
+        minHeight: "90px",
       }}
-      className="w-full py-4 flex relative flex-row justify-between px-10 items-center"
+      className="w-full absolute py-4 flex  flex-row justify-between px-10 items-center"
     >
       {shouldShowHome ? (
         <Link
@@ -414,49 +413,23 @@ const handleSaveWsConfig = () => {
         <div className="opacity-0">home</div>
       )}
 
-      <div>
+      {/* <div>
         <TextRevealCard
           text="Test. Tweak. Repeat."
           revealText="Master Your Machine"
           textSize={40}
         />
-      </div>
+      </div> */}
 
       {/* Right side indicators */}
       <div
         style={
-          isHome
-            ? {
-                transform: "translateY(0%)",
-              }
-            : {
-                transform: "translateY(110%)",
-              }
+{
+                transform: "translateY(0%)"
+}            
         }
         className="flex items-center gap-3 transition-all duration-800"
       >
-         {/* <button
-        onClick={() => {
-          // Get all cycles from Redux
-          console.log(localCycles)
-        }}
-        style={{
-          position: "fixed",
-          bottom: 20,
-          right: 20,
-          zIndex: 9999, 
-          background: "#222",
-          color: "#fff",
-          padding: "10px 18px",
-          borderRadius: 8,
-          border: "1px solid #444",
-          fontSize: 14,
-          cursor: "pointer",
-          opacity: 0.8,
-        }}
-      >
-        Debug: Log All Cycles
-      </button> */}
         {/* WebSocket Connection Status */}
         <div
           className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
@@ -499,14 +472,14 @@ const handleSaveWsConfig = () => {
               }
         }
       >
-        <VoiceWidget
+        {/* <VoiceWidget
           onWakeWord={() => {
             console.log("wake word detected");
             if (!session) {
               startAgentSession(setSession);
             }
           }}
-        />
+        /> */}
       </div>
 
       {/* Path Management Modal */}

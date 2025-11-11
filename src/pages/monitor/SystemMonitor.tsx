@@ -57,6 +57,7 @@ interface Phase {
     type: string;
     pinNumber: number;
     threshold: number;
+    triggerAbove: boolean;
   };
 }
 
@@ -599,7 +600,7 @@ function SystemMonitor() {
                       {/* Sensor Trigger Indicator */}
                       {fullPhase?.sensorTrigger && (
                         <span
-                          title={`Sensor Trigger: ${fullPhase.sensorTrigger.type} ≥ ${fullPhase.sensorTrigger.threshold} (Pin ${fullPhase.sensorTrigger.pinNumber})`}
+                          title={`Sensor Trigger: ${fullPhase.sensorTrigger.type} ${fullPhase.sensorTrigger?.triggerAbove ? ">=" : "<="} ${fullPhase.sensorTrigger.threshold} (Pin ${fullPhase.sensorTrigger.pinNumber})`}
                           style={{
                             position: "absolute",
                             top: "4px",
