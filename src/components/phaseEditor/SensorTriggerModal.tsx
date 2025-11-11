@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, ArrowUp, ArrowDown } from "lucide-react";
 import type { SensorTrigger } from "../../types/common/Phase";
 
 interface SensorTriggerModalProps {
@@ -24,6 +24,7 @@ function SensorTriggerModal({
   const [enabled, setEnabled] = useState(!!currentTrigger);
   const [type, setType] = useState(currentTrigger?.type || "RPM");
   const [threshold, setThreshold] = useState(currentTrigger?.threshold || 400);
+  const [triggerAbove, setTriggerAbove] = useState(currentTrigger?.triggerAbove !== false); // Default to true (above)
 
   // Add useEffect to sync state with currentTrigger prop
   useEffect(() => {
@@ -31,17 +32,16 @@ function SensorTriggerModal({
       setEnabled(!!currentTrigger);
       setType(currentTrigger?.type || "RPM");
       setThreshold(currentTrigger?.threshold || 400);
+      setTriggerAbove(currentTrigger?.triggerAbove !== false);
     }
   }, [currentTrigger, isOpen]);
-
-
 
   // Get pin number automatically based on sensor type
   const pinNumber = SENSOR_PIN_MAP[type];
 
   const handleSave = () => {
     if (enabled) {
-      onSave({ type, pinNumber, threshold });
+      onSave({ type, pinNumber, threshold, triggerAbove });
     } else {
       onSave(null);
     }
@@ -59,7 +59,7 @@ function SensorTriggerModal({
   if (!isOpen) return null;
 
   return (
-    <div  className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-[#1a1a1a] border border-gray-600 rounded-lg p-6 w-96">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-white">
@@ -123,6 +123,40 @@ function SensorTriggerModal({
                 />
               </div>
 
+              {/* Trigger Direction Toggle */}
+              <div>
+                <label className="text-white text-sm font-medium mb-2 block">
+                  Trigger Direction
+                </label>
+                <div className="flex gap-2">
+                  <div
+                    onClick={() => setTriggerAbove(true)}
+                    className={`flex-1 flex items-center justify-center gap-2 h-10 rounded transition-colors ${
+                      triggerAbove
+                        ? "bg-green-600 text-white border border-green-500"
+                        : "bg-[#18181b] border border-gray-600 text-gray-400 hover:border-gray-500"
+                    }`}
+                  >
+                    <ArrowUp size={16} />
+                    <span className="text-sm font-medium">Above</span>
+                  </div>
+                  <div
+                    onClick={() => setTriggerAbove(false)}
+                    className={`flex-1 flex items-center justify-center gap-2 h-10 rounded transition-colors ${
+                      !triggerAbove
+                        ? "bg-red-600 text-white border border-red-500"
+                        : "bg-[#18181b] border border-gray-600 text-gray-400 hover:border-gray-500"
+                    }`}
+                  >
+                    <ArrowDown size={16} />
+                    <span className="text-sm font-medium">Below</span>
+                  </div>
+                </div>
+                <div className="text-gray-400 text-xs mt-1">
+                  Trigger when sensor value is {triggerAbove ? "above" : "below"} threshold
+                </div>
+              </div>
+
               {/* Help Text */}
               <div className="bg-gray-800/50 border border-gray-700 rounded p-3">
                 <div className="text-gray-300 text-xs">
@@ -130,9 +164,10 @@ function SensorTriggerModal({
                   <br />
                   • Sensor: {type} (Pin {pinNumber})
                   <br />
-                  • Trigger: When reading{" "}
-                  {type === "RPM" ? "reaches" : "exceeds"} {threshold}{" "}
-                  {getSensorUnit(type)}
+                  • Threshold: {threshold} {getSensorUnit(type)}
+                  <br />
+                  • Trigger: When reading {triggerAbove ? "↑ exceeds" : "↓ falls below"}{" "}
+                  {threshold} {getSensorUnit(type)}
                   <br />
                   • Action: Advance to next phase
                 </div>
