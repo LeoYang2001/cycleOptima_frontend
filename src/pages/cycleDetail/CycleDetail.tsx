@@ -70,35 +70,50 @@ const [isRedirecting, setIsRedirecting] = useState(false);
   };
 
 // Helper function to clean cycle data for flashing (remove UI-only attributes)
+// Helper function to clean cycle data for flashing (remove UI-only attributes)
 const cleanCycleDataForFlash = (cycleData: any) => {
   return {
-    phases: cycleData.phases.map((phase: any) => ({
-      id: phase.id,
-      startTime: phase.startTime,
-      components: phase.components.map((component: any) => {
-        const cleanComponent: any = {
-          id: component.id,
-          start: component.start,
-          compId: component.compId,
-          duration: component.duration,
-        };
-
-        // Only include motorConfig if it exists, and clean it
-        if (component.motorConfig) {
-          cleanComponent.motorConfig = {
-            repeatTimes: component.motorConfig.repeatTimes,
-            pattern: component.motorConfig.pattern.map((step: any) => ({
-              stepTime: step.stepTime,
-              pauseTime: step.pauseTime,
-              direction: step.direction,
-            })),
+    phases: cycleData.phases.map((phase: any) => {
+      const cleanPhase: any = {
+        id: phase.id,
+        startTime: phase.startTime,
+        components: phase.components.map((component: any) => {
+          const cleanComponent: any = {
+            id: component.id,
+            start: component.start,
+            compId: component.compId,
+            duration: component.duration,
           };
-        }
 
-        return cleanComponent;
-      }),
+          // Only include motorConfig if it exists, and clean it
+          if (component.motorConfig) {
+            cleanComponent.motorConfig = {
+              repeatTimes: component.motorConfig.repeatTimes,
+              pattern: component.motorConfig.pattern.map((step: any) => ({
+                stepTime: step.stepTime,
+                pauseTime: step.pauseTime,
+                direction: step.direction,
+              })),
+            };
+          }
+
+          return cleanComponent;
+        }),
+      };
+
+      // Include sensorTrigger if it exists
+      if (phase.sensorTrigger) {
+        cleanPhase.sensorTrigger = {
+          type: phase.sensorTrigger.type,
+          pinNumber: phase.sensorTrigger.pinNumber,
+          threshold: phase.sensorTrigger.threshold,
+          triggerAbove: phase.sensorTrigger.triggerAbove,
+        };
+      }
+
+      return cleanPhase;
       // Remove: label, runningStyle, name, color
-    })),
+    }),
   };
 };
 
@@ -113,7 +128,6 @@ const executeRun = async () => {
 
     setIsRunning(true);
     setFlashCompleted(false);
-
     // Clean the cycle data before flashing (remove UI-only attributes)
     const cleanedData = cleanCycleDataForFlash(cycle.data);
     console.log('Cleaned cycle data for flash:', cleanedData);
