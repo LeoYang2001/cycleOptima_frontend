@@ -4,6 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { AppDispatch } from '../../store';
 import SensorDataPresentation, { type SensorDataPoint } from "../../components/monitor/sensorDataPresentation";
 import LiveSensorCard from "../../components/monitor/LiveSensorCard";
+import PhaseInfoModal from "../../components/monitor/PhaseInfoModal";
 import { websocketManager, selectWebSocketConnected } from '../../store/websocketSlice';
 import {
   selectTelemetry,
@@ -129,6 +130,31 @@ function SystemMonitor() {
   const [ifRunningCycle, setIfRunningCycle] = useState(false);
   const [sensorLog, setSensorLog] = useState<SensorLogEntry[]>([]);
   const [sensorHistory, setSensorHistory] = useState<SensorDataPoint[]>([]);
+  
+  // State to track loading pins
+  const [loadingPins, setLoadingPins] = useState<Set<number>>(new Set());
+  
+  // State to track loading actions
+  const [isStartingCycle, setIsStartingCycle] = useState(false);
+  const [isStoppingCycle, setIsStoppingCycle] = useState(false);
+  const [isSkippingPhase, setIsSkippingPhase] = useState(false);
+  
+  // State for phase info modal
+  const [showPhaseModal, setShowPhaseModal] = useState(false);
+  const [selectedPhase, setSelectedPhase] = useState<{
+    id: string;
+    name: string;
+    color: string;
+    duration: number;
+    index: number;
+    components?: Array<{
+      id: string;
+      label: string;
+      start_ms: number;
+      duration_ms: number;
+      has_motor: boolean;
+    }>;
+  } | null>(null);
 
   // Helper function to get GPIO state by pin number
   const getGPIOState = (pin: number): boolean => {
@@ -326,12 +352,48 @@ function SystemMonitor() {
       return;
     }
 
-    // Use the togglePin action from washer slice
-    // @ts-ignore - dispatch returns a thunk function
-    const success = dispatch(togglePinAction(pin));
-    
-    if (!success) {
-      console.error(`Failed to toggle pin ${pin} - WebSocket may not be connected`);
+    // Prevent toggling if this pin is already being processed
+    if (loadingPins.has(pin)) {
+      console.log(`Pin ${pin} is already being toggled`);
+      return;
+    }
+
+    // Add pin to loading state
+    setLoadingPins(prev => new Set(prev).add(pin));
+
+    try {
+      // Use the togglePin action from washer slice
+      // @ts-ignore - dispatch returns a thunk function
+      const success = dispatch(togglePinAction(pin));
+      
+      if (!success) {
+        console.error(`Failed to toggle pin ${pin} - WebSocket may not be connected`);
+        // Remove from loading immediately if send failed
+        setLoadingPins(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(pin);
+          return newSet;
+        });
+        return;
+      }
+
+      // Wait for telemetry update (remove from loading after 2 seconds)
+      setTimeout(() => {
+        setLoadingPins(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(pin);
+          return newSet;
+        });
+      }, 2000);
+      
+    } catch (error) {
+      console.error(`Error toggling pin ${pin}:`, error);
+      // Remove from loading on error
+      setLoadingPins(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(pin);
+        return newSet;
+      });
     }
   };
 
@@ -345,15 +407,39 @@ function SystemMonitor() {
 
 
   const handleStartCycle = () => {
+    if (isStartingCycle) return; // Prevent double clicks
+    
+    setIsStartingCycle(true);
     dispatch(startCycle());
+    
+    // Remove loading state after 2 seconds
+    setTimeout(() => {
+      setIsStartingCycle(false);
+    }, 2000);
   };
 
   const handleStopCycle = () => {
+    if (isStoppingCycle) return; // Prevent double clicks
+    
+    setIsStoppingCycle(true);
     dispatch(stopCycle());
+    
+    // Remove loading state after 2 seconds
+    setTimeout(() => {
+      setIsStoppingCycle(false);
+    }, 2000);
   };
 
   const handleSkipPhase = () => {
+    if (isSkippingPhase) return; // Prevent double clicks
+    
+    setIsSkippingPhase(true);
     dispatch(skipPhase());
+    
+    // Remove loading state after 2 seconds
+    setTimeout(() => {
+      setIsSkippingPhase(false);
+    }, 2000);
   };
 
     const handleSkipToPhase = (index: number) => {
@@ -495,32 +581,7 @@ function SystemMonitor() {
             </h3>
           </div>
 
-          {/* Overall Progress */}
-          <div style={{ marginBottom: "20px" }}>
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              marginBottom: "8px" 
-            }}>
-              <span style={{ fontSize: "14px", color: "#94a3b8" }}>Overall Progress</span>
-              <span style={{ fontSize: "14px", fontWeight: "600" }}>
-                {calculateProgress().toFixed(1)}%
-              </span>
-            </div>
-            <div style={{
-              background: "#333",
-              borderRadius: "4px",
-              height: "8px",
-              overflow: "hidden"
-            }}>
-              <div style={{
-                background: "#22c55e",
-                height: "100%",
-                width: `${calculateProgress()}%`,
-                transition: "width 0.3s ease"
-              }}></div>
-            </div>
-          </div>
+        
 
           {/* Current Phase */}
           <div style={{ marginBottom: "20px" }}>
@@ -559,32 +620,36 @@ function SystemMonitor() {
           <div style={{ marginBottom: "20px" }}>
             <div style={{ fontSize: "14px", color: "#94a3b8", marginBottom: "12px" }}>
               Phase Timeline
-              {cycleDataFromTelemetry.length > 0 && " (Live from ESP32)"}
-              {!cycleDataFromTelemetry.length && cycleData && ` (${cycleData.data.name})`}
+              {/* {cycleDataFromTelemetry.length > 0 && " (Live from ESP32)"}
+              {!cycleDataFromTelemetry.length && cycleData && ` (${cycleData.data.name})`} */}
             </div>
             <div style={{ display: "flex", height: "40px", borderRadius: "6px" }}>
               {phaseTimeline.length > 0 ? (
                 phaseTimeline.map((phase, index) => {
                   // Check for sensor trigger - only from navigation cycleData (not in telemetry cycle_data)
                   const fullPhase = cycleData?.data.phases?.find(p => p.id === phase.id || p.name === phase.name);
-
-                  return (
+                 
+                  return (  
                     <div 
-                      
-                      onClick={()=>{
-                        // also do not allow skip backwards
-                        if(cycleStatus?.current_phase_index === 0){
-                          alert("Cannot skip phases while idle");
-                          return;
-                        }
-                        if(cycleStatus?.current_phase_index && cycleStatus?.current_phase_index > phase.index)
-                        {
-                          alert("Cannot skip backwards to previous phases");
-                          return;
-                        }
-                        else{
-                          handleSkipToPhase(phase.index - 1);
-                        }
+                    className=" cursor-pointer"
+                      onClick={() => {
+                        // Get full phase data from cycleData
+                        const fullPhaseData = cycleData?.data.phases?.find(p => p.id === phase.id || p.name === phase.name);
+                        
+                        // Map components to match selectedPhase interface
+                        const mappedComponents = fullPhaseData?.components.map(comp => ({
+                          id: comp.id,
+                          label: comp.label,
+                          start_ms: comp.start,
+                          duration_ms: comp.duration,
+                          has_motor: !!comp.motorConfig
+                        })) || [];
+                        
+                        setSelectedPhase({
+                          ...phase,
+                          components: mappedComponents
+                        });
+                        setShowPhaseModal(true);
                       }}
                       key={phase.id || phase.name}
                       style={{ 
@@ -638,53 +703,26 @@ function SystemMonitor() {
                   );
                 })
               ) : (
-                // Default phases when no cycle data
-                <>
-                  <div style={{ 
-                    background: "#1e40af", 
-                    flex: "1", 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    fontSize: "12px",
-                    fontWeight: "600"
-                  }}>
-                    Pre-wash
+                // No cycle data - show empty state
+                <div style={{ 
+                  flex: "1",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "20px",
+                  background: "#0f172a",
+                  border: "2px dashed #334155",
+                  borderRadius: "6px",
+                  gap: "8px"
+                }}>
+                  <div style={{ fontSize: "14px", fontWeight: "600", color: "#94a3b8" }}>
+                    No Cycle Data Loaded
                   </div>
-                  <div style={{ 
-                    background: "#059669", 
-                    flex: "1", 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    fontSize: "12px",
-                    fontWeight: "600"
-                  }}>
-                    Main wash
+                  <div style={{ fontSize: "12px", color: "#64748b", textAlign: "center" }}>
+                    Please flash a cycle to the ESP32 to begin monitoring
                   </div>
-                  <div style={{ 
-                    background: "#d97706", 
-                    flex: "1", 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    fontSize: "12px",
-                    fontWeight: "600"
-                  }}>
-                    Rinse
-                  </div>
-                  <div style={{ 
-                    background: "#dc2626", 
-                    flex: "1", 
-                    display: "flex", 
-                    alignItems: "center", 
-                    justifyContent: "center",
-                    fontSize: "12px",
-                    fontWeight: "600"
-                  }}>
-                    Final spin
-                  </div>
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -704,7 +742,7 @@ function SystemMonitor() {
               <div style={{ fontSize: "32px", fontWeight: "700", color: cycleStatus?.current_phase_index === 0 ? "#6b7280" : "#fff" }}>
                 {cycleStatus?.current_phase_index === 0 
                   ? "IDLE" 
-                  : currentPhaseName || "—"
+                  : (cycleStatus?.current_phase_index !== undefined ? cycleData?.data.phases[cycleStatus.current_phase_index - 1]?.name : undefined) || "—"
                 }
               </div>
               <div style={{ fontSize: "12px", color: "#64748b" }}>Current Status</div>
@@ -752,49 +790,53 @@ function SystemMonitor() {
             <button
               style={{
                 padding: "12px 20px",
-                background: "#22c55e",
+                background: isStartingCycle ? "#16a34a" : "#22c55e",
                 color: "#fff",
                 border: "none",
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: cycleRunning ? "not-allowed" : "pointer",
+                cursor: (cycleRunning || isStartingCycle) ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                opacity: cycleRunning ? "0.5" : "1",
-                transition: "all 0.2s ease"
+                opacity: (cycleRunning || isStartingCycle) ? "0.7" : "1",
+                transition: "all 0.2s ease",
+                position: "relative"
               }}
               onClick={handleStartCycle}
-              disabled={cycleRunning}
-              title={cycleRunning ? "Cannot start while cycle is running" : "Start cycle"}
+              disabled={cycleRunning || isStartingCycle}
+              title={cycleRunning ? "Cannot start while cycle is running" : isStartingCycle ? "Starting..." : "Start cycle"}
             >
-              ▶ Start Cycle
+            
+              {isStartingCycle ? "Starting..." : "▶ Start Cycle"}
             </button>
 
             {/* Stop Cycle Button - Only enabled when cycle is running */}
             <button
               style={{
                 padding: "12px 20px",
-                background: "#ef4444",
+                background: isStoppingCycle ? "#dc2626" : "#ef4444",
                 color: "#fff",
                 border: "none",
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: !cycleRunning || ifStoppingCycle ? "not-allowed" : "pointer",
+                cursor: (!cycleRunning || isStoppingCycle) ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                opacity: !cycleRunning || ifStoppingCycle ? "0.5" : "1",
-                transition: "all 0.2s ease"
+                opacity: (!cycleRunning || isStoppingCycle) ? "0.7" : "1",
+                transition: "all 0.2s ease",
+                position: "relative"
               }}
               onClick={handleStopCycle}
-              disabled={!cycleRunning || ifStoppingCycle}
+              disabled={!cycleRunning || isStoppingCycle}
               title={!cycleRunning ? "No cycle running to stop" : 
-                     ifStoppingCycle ? "Stopping cycle..." : "Stop cycle"}
+                     isStoppingCycle ? "Stopping cycle..." : "Stop cycle"}
             >
-              {ifStoppingCycle ? '⏳ Stopping...' : '⏹ Stop Cycle'}
+             
+              {isStoppingCycle ? "Stopping..." : "⏹ Stop Cycle"}
             </button>
 
          
@@ -803,24 +845,26 @@ function SystemMonitor() {
             <button
               style={{
                 padding: "12px 20px",
-                background: "#6b7280",
+                background: isSkippingPhase ? "#52525b" : "#6b7280",
                 color: "#fff",
                 border: "none",
                 borderRadius: "8px",
                 fontWeight: "600",
                 fontSize: "14px",
-                cursor: !cycleRunning ? "not-allowed" : "pointer",
+                cursor: (!cycleRunning || isSkippingPhase) ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                opacity: !cycleRunning ? "0.5" : "1",
-                transition: "all 0.2s ease"
+                opacity: (!cycleRunning || isSkippingPhase) ? "0.7" : "1",
+                transition: "all 0.2s ease",
+                position: "relative"
               }}
               onClick={handleSkipPhase}
-              disabled={!cycleRunning}
-              title={!cycleRunning ? "No cycle running" : "Skip current phase"}
+              disabled={!cycleRunning || isSkippingPhase}
+              title={!cycleRunning ? "No cycle running" : isSkippingPhase ? "Skipping..." : "Skip current phase"}
             >
-              ⏭ Skip Phase
+             
+              {isSkippingPhase ? "Skipping..." : "⏭ Skip Phase"}
             </button>
 
          
@@ -933,45 +977,116 @@ function SystemMonitor() {
         }}>
           {pins.map(({ name, pin }) => {
             const isOn = !getGPIOState(pin);
+            const isLoading = loadingPins.has(pin);
+            const isMotorDirection = pin === 10;
+            
+            // Motor direction: LOW (0) = Counter-Clockwise (default), HIGH (1) = Clockwise
+            const isClockwise = isMotorDirection ? !getGPIOState(pin) : false;
+            
             return (
               <button
                 key={pin}
                 style={{
                   padding: "20px",
-                  background: isOn ? "#059669" : "#374151",
+                  background: isLoading ? "#4b5563" : isOn ? "#059669" : "#374151",
                   color: "#fff",
-                  border: isOn ? "2px solid #10b981" : "2px solid #4b5563",
+                  border: isLoading ? "2px solid #6b7280" : isOn ? "2px solid #10b981" : "2px solid #4b5563",
                   borderRadius: "12px",
                   fontWeight: "600",
                   fontSize: "14px",
-                  cursor: cycleRunning ? "not-allowed" : "pointer",
+                  cursor: (cycleRunning || isLoading) ? "not-allowed" : "pointer",
                   transition: "all 0.2s ease",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   gap: "8px",
-                  opacity: cycleRunning ? "0.7" : "1"
+                  opacity: (cycleRunning || isLoading) ? "0.7" : "1",
+                  position: "relative"
                 }}
                 onClick={() => togglePin(pin)}
-                disabled={cycleRunning}
-                title={cycleRunning ? "Cannot toggle components while cycle is running" : ""}
+                disabled={cycleRunning || isLoading}
+                title={
+                  cycleRunning ? "Cannot toggle components while cycle is running" 
+                  : isLoading ? "Updating..." 
+                  : isMotorDirection ? (isClockwise ? "Click to change to Counter-Clockwise" : "Click to change to Clockwise")
+                  : ""
+                }
               >
-                <div style={{ 
-                  width: "12px", 
-                  height: "12px", 
-                  borderRadius: "50%",
-                  background: isOn ? "#10b981" : "#6b7280"
-                }}></div>
-                <div style={{ fontSize: "12px", textAlign: "center" }}>
-                  {name.replace("_PIN", "").replace("_", " ")}
-                </div>
-                <div style={{ 
-                  fontSize: "10px", 
-                  color: isOn ? "#86efac" : "#9ca3af",
-                  fontWeight: "500"
-                }}>
-                  Pin {pin} - {isOn ? "ON" : "OFF"}
-                </div>
+                {/* Loading Spinner Overlay */}
+                {isLoading && (
+                  <div style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    width: "24px",
+                    height: "24px",
+                    border: "3px solid rgba(255,255,255,0.3)",
+                    borderTop: "3px solid #fff",
+                    borderRadius: "50%",
+                    animation: "spin 1s linear infinite"
+                  }} />
+                )}
+                
+                {isMotorDirection ? (
+                  // Special rendering for Motor Direction
+                  <>
+                    <div 
+                    style={{ 
+                      fontSize: "24px",
+                      opacity: isLoading ? 0.5 : 1,
+                      transform: isClockwise ? "rotate(0deg)" : "rotate(180deg)",
+                      transition: "transform 0.3s ease"
+                    }}>
+                      ↻
+                    </div>
+                    
+                    <div style={{ 
+                      fontSize: "12px", 
+                      textAlign: "center",
+                      opacity: isLoading ? 0.5 : 1
+                    }}>
+                      {name.replace("_PIN", "").replace("_", " ")}
+                    </div>
+                    
+                    <div style={{ 
+                      fontSize: "10px", 
+                      color: isLoading ? "#9ca3af" : "#86efac",
+                      fontWeight: "600",
+                      opacity: isLoading ? 0.5 : 1
+                    }}>
+                      {isLoading ? "UPDATING..." : isClockwise ? "CLOCKWISE" : "COUNTER-CW"}
+                    </div>
+                  </>
+                ) : (
+                  // Standard rendering for other pins
+                  <>
+                    <div style={{ 
+                      width: "12px", 
+                      height: "12px", 
+                      borderRadius: "50%",
+                      background: isLoading ? "#9ca3af" : isOn ? "#10b981" : "#6b7280",
+                      opacity: isLoading ? 0.5 : 1
+                    }}></div>
+                    
+                    <div style={{ 
+                      fontSize: "12px", 
+                      textAlign: "center",
+                      opacity: isLoading ? 0.5 : 1
+                    }}>
+                      {name.replace("_PIN", "").replace("_", " ")}
+                    </div>
+                    
+                    <div style={{ 
+                      fontSize: "10px", 
+                      color: isLoading ? "#9ca3af" : isOn ? "#86efac" : "#9ca3af",
+                      fontWeight: "500",
+                      opacity: isLoading ? 0.5 : 1
+                    }}>
+                      Pin {pin} - {isLoading ? "UPDATING..." : isOn ? "ON" : "OFF"}
+                    </div>
+                  </>
+                )}
               </button>
             );
           })}
@@ -985,6 +1100,18 @@ function SystemMonitor() {
         setSensorHistory={setSensorHistory}
         onClose={() => setShowSensorModal(false)}
         telemetryData={telemetryData}
+      />
+
+      {/* Phase Info Modal */}
+      <PhaseInfoModal
+        isOpen={showPhaseModal}
+        onClose={() => setShowPhaseModal(false)}
+        selectedPhase={selectedPhase}
+        cycleStatus={cycleStatus}
+        totalPhases={phaseTimeline.length}
+        onSkipToPhase={handleSkipToPhase}
+        formatElapsedTime={formatElapsedTime}
+        phaseElapsedMs={cycleStatus?.phase_elapsed_ms}
       />
     </div>
   );

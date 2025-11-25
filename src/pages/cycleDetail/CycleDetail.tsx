@@ -511,10 +511,11 @@ const updateCycleName = async (newName: string) => {
             {/* Run/Monitor Status Indicator */}
             {isRedirecting ? (
               <div className="flex items-center gap-3 bg-green-900/20 border border-green-600/30 rounded-lg px-3 py-2">
-                <div className="flex items-center gap-2">
-                  {/* Spinner Animation */}
+                <div className="flex items-center  gap-2">
+                 <div className="  h-5 w-5 relative ">
+                   {/* Spinner Animation */}
                   <svg
-                    className="animate-spin h-5 w-5 text-green-400"
+                    className="animate-spin  h-5 w-5 text-green-400"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"
@@ -533,6 +534,7 @@ const updateCycleName = async (newName: string) => {
                       d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
                     ></path>
                   </svg>
+                  </div>
                   <span className="text-green-300 text-sm font-medium">
                     Redirecting to monitor...
                   </span>
